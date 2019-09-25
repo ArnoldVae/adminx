@@ -1,0 +1,22 @@
+{
+	"moduleType": [
+		{
+			"value": "0",
+			"vcName": "平台"
+		},
+		{
+			"value": "1",
+			"vcName": "外部URL"
+		},
+		{
+			"value": "2",
+			"vcName": "APP"
+		}
+	],
+	"moduleAreaType": [
+		{
+			"value": "0",
+			"vcName": "默认"
+		}
+	]
+}

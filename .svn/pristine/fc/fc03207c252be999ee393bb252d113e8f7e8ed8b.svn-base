@@ -1,0 +1,13 @@
+import dataDict from './data-dict'
+import inspectionService from './inspection-service'
+import dataRobot from './data-robot'
+import dataUpload from './data-upload'
+import dataEnvManage from './data-envManage'
+
+export default {
+	dataDict,
+	inspectionService,
+	dataRobot,
+	dataUpload,
+	dataEnvManage
+}

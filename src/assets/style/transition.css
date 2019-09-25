@@ -1,0 +1,68 @@
+/* 默认上下 */
+.down-enter-active,
+.down-leave-active {
+	transition: opacity 0.5s;
+	transition: all 0.5s ease;
+}
+.down-enter,
+.down-leave-to {
+	opacity: 0;
+	transform: translateY(70px);
+}
+/* 左右切换 */
+.right-enter,
+.right-leave-to {
+	opacity: 0;
+	transform: translate(60px);
+}
+.right-enter-active,
+.right-leave-active {
+	/* transition: opacity .5s; */
+	transition: all 0.5s ease;
+}
+/* 淡入淡出 */
+.gradual-enter,
+.gradual-leave-to {
+	opacity: 0;
+	/* transform: translate(100px); */
+}
+.gradual-enter-active,
+.gradual-leave-active {
+	transition: opacity 0.5s;
+	transition: all 0.5s ease;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar,
+::-webkit-scrollbar:hover,
+::-webkit-scrollbar-track {
+	background-color: rgb(9, 16, 46);
+	width: 10px;
+	height: 0px;
+}
+
+::-webkit-scrollbar-corner,
+::-webkit-scrollbar-thumb {
+	background: rgba(36, 64, 88, 0.48);
+}
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(36, 64, 88, 0.9);
+}
+
+::-webkit-scrollbar-button:horizontal:single-button:start {
+	background: #033856;
+}
+
+::-webkit-scrollbar-button:horizontal:single-button:end {
+	background: #033856;
+}
+
+::-webkit-scrollbar-button:vertical:single-button:start {
+	background: #033856;
+	height: 0px;
+}
+
+::-webkit-scrollbar-button:vertical:single-button:end {
+	background: #033856;
+	height: 0px;
+}

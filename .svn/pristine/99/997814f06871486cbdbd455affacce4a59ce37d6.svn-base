@@ -1,0 +1,165 @@
+<template>
+	<div class="transfer-main">
+		<el-row>
+			<el-col :span="12">
+				<div class="transfer-main-left">
+					<div class="title">
+						<el-checkbox v-model="checkAllFlag" @change="handleCheckAll">备选项{{ checkNodeList }}
+						</el-checkbox>
+					</div>
+					<div class="content">
+						<el-tree
+							ref="tree"
+							:data="treeList"
+							show-checkbox
+							node-key="key"
+							@check-change="checkChange"
+							:default-expanded-keys="[2, 3]"
+							:props="defaultProps"
+						>
+						</el-tree>
+						<!--						<Tree :data="treeList" show-checkbox></Tree>-->
+					</div>
+				</div>
+			</el-col>
+			<el-col :span="12">
+				<div class="transfer-main-left">
+					<div class="title"></div>
+					s
+				</div>
+			</el-col>
+		</el-row>
+	</div>
+</template>
+
+<script>
+	export default {
+		name: 'markdown_page',
+		props: ['treeList'],
+		components: {},
+		data() {
+			return {
+				content: '',
+				checkAllFlag: false,
+				allCount: this.getNodeNum(),
+				checkNodeList: [],
+				baseData: [
+					{
+						expand: true,
+						title: 'parent 1',
+						children: [
+							{
+								title: 'parent 1-0',
+								expand: true,
+								disabled: true,
+								children: [
+									{
+										title: 'leaf',
+										disableCheckbox: true
+									},
+									{
+										title: 'leaf'
+									}
+								]
+							},
+							{
+								title: 'parent 1-1',
+								expand: true,
+								checked: true,
+								children: [
+									{
+										title: '<span style="color: red">leaf</span>'
+									}
+								]
+							}
+						]
+					}
+				],
+				defaultProps: {
+					children: 'children',
+					label: 'label'
+				}
+			}
+		},
+		created() {
+
+		},
+		mounted() {
+			this.checkAllFlag = true
+			this.handleCheckAll()
+		},
+		methods: {
+			handleCheckAll() {
+				console.log(this.allCount)
+				this.checkNodeList = []
+				this.treeList.forEach(item => {
+					this.checkNodeList.push(item.key)
+				})
+				if (this.checkAllFlag) {
+					this.$refs.tree.setCheckedKeys(this.checkNodeList)
+				} else {
+					this.$refs.tree.setCheckedKeys([])
+				}
+			},
+			checkChange(node, stauts) {
+				let arr = this.treeList
+				console.log(this.$refs.tree.getCheckedKeys())
+				console.log(stauts)
+				// this.checkAllFlag = arr.every(item=>{
+				//
+				// })
+			},
+			getNodeNum() {
+				let num = 0
+				debugger
+				this.treeList.forEach(item => {
+					num++
+					if(item.children.length>0){
+						item.children.forEach(i=>{
+							num++
+						})
+					}
+
+				})
+				return num
+
+			}
+		}
+	}
+</script>
+
+<style lang="stylus" scoped>
+	.transfer-main {
+		width: 100%;
+
+		.el-row {
+			.el-col {
+				padding 10px
+
+				.transfer-main-left {
+					width: 100%;
+					border: 1px solid #d7dde4;
+					height 400px
+					border-top-right-radius 6px
+					border-top-left-radius 6px
+
+					.title {
+						line-height 45px
+						padding 0 10px
+						background-color: #f7f7f7;
+						border-bottom 1px solid #d7dde4
+						border-top-right-radius 6px
+						border-top-left-radius 6px
+						height 45px
+					}
+
+					.content {
+						height 350px
+						overflow auto
+					}
+				}
+			}
+		}
+
+	}
+</style>

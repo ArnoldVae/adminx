@@ -1,0 +1,351 @@
+<template>
+	<div class="emq-resource-manage">
+		<div class="tool-bar">
+			<searche-Header-Wrapper>
+				<div class="btn-box">
+					<Button type="success" size="large" icon="md-add" @click="handleModalShow(0)">新增</Button>
+				</div>
+			</searche-Header-Wrapper>
+		</div>
+
+		<div class="table-content">
+			<Table border :columns="tableColumns" :data="tableData" :height="650"></Table>
+			<div class="table-page">
+				<div class="page-content">
+					<Page
+						@on-change="handleChangePage"
+						@on-page-size-change="handleChangePageSize"
+						:total="total"
+						:current="page"
+						:page-size="pageSize"
+						show-elevator
+						show-total
+						show-sizer
+					/>
+				</div>
+			</div>
+		</div>
+
+		<Modal v-model="modalShow" :title="modalTitle" :mask-closable="false">
+			<Form ref="add-form" :model="addFormData" :rules="ruleValidate" :label-width="100" label-position="right">
+				<FormItem label="资源名称" prop="vcName">
+					<Input v-model="addFormData.vcName" placeholder="请输入..." />
+				</FormItem>
+
+				<FormItem label="资源IP地址" prop="vcIp">
+					<Input v-model="addFormData.vcIp" placeholder="请输入..." />
+				</FormItem>
+				<FormItem label="资源端口号" prop="iPort">
+					<Input v-model="addFormData.iPort" placeholder="请输入..." />
+				</FormItem>
+				<FormItem label="状态" prop="iIsEnable">
+					<RadioGroup v-model="addFormData.iIsEnable">
+						<Radio label="1" value="1">启用</Radio>
+						<Radio label="0" value="0">禁用</Radio>
+					</RadioGroup>
+				</FormItem>
+				<FormItem label="参数1" prop="iParam1">
+					<Input v-model="addFormData.iParam1" placeholder="请输入..." />
+				</FormItem>
+				<FormItem label="参数2" prop="iParam2">
+					<Input v-model="addFormData.iParam2" placeholder="请输入..." />
+				</FormItem>
+				<FormItem label="参数3" prop="iParam3">
+					<Input v-model="addFormData.iParam3" placeholder="请输入..." />
+				</FormItem>
+				<FormItem label="参数4" prop="iParam4">
+					<Input v-model="addFormData.iParam4" placeholder="请输入..." />
+				</FormItem>
+				<FormItem label="参数5" prop="iParam5">
+					<Input v-model="addFormData.iParam5" placeholder="请输入..." />
+				</FormItem>
+				<FormItem label="参数6" prop="iParam6">
+					<Input v-model="addFormData.iParam6" placeholder="请输入..." />
+				</FormItem>
+			</Form>
+
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button type="primary" size="large" @click="handleSaveArea">确认</Button>
+			</div>
+		</Modal>
+	</div>
+</template>
+<script>
+export default {
+	data() {
+		return {
+			axios: this.$api.emqResourceManage,
+			addFormData: {
+				emqId: '',
+				mainStationId: '',
+				vcName: '',
+				vcIp: '',
+				iPort: '',
+				iIsEnable: '1',
+				iParam1: '',
+				iParam2: '',
+				iParam3: '',
+				iParam4: '',
+				iParam5: '',
+				iParam6: ''
+			},
+			tableColumns: [
+				{ title: '资源名称', key: 'vcName', align: 'center' },
+				{ title: '资源IP地址', key: 'vcIp', align: 'center', minWidth: 200 },
+				{ title: '资源端口号', key: 'iPort', align: 'center' },
+				{
+					title: '状态',
+					key: 'iIsEnable',
+					align: 'center',
+					render(h, params) {
+						return h('div', [params.row.iIsEnable == 1 ? '启用' : '禁用'])
+					}
+				},
+				{
+					title: '操作',
+					key: 'action',
+					align: 'center',
+					width: 210,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										icon: 'ios-create-outline'
+									},
+									style: {
+										marginRight: '5px'
+									},
+									on: {
+										click: () => {
+											this.handleModalShow(1, params)
+										}
+									}
+								},
+								'编辑'
+							),
+							h(
+								'Button',
+								{
+									props: {
+										type: 'error',
+										icon: 'md-trash'
+									},
+									on: {
+										click: () => {
+											this.handleRemove(params)
+										}
+									}
+								},
+								'删除'
+							)
+						])
+					}
+				}
+			],
+			ruleValidate: {
+				vcName: [{ required: true, message: '该项为必填项', trigger: 'blur' }],
+				vcIp: [
+					{
+						required: true,
+						pattern: /^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$/,
+						message: '请输入正确的IP地址',
+						trigger: 'blur'
+					}
+				],
+				iPort: [{ required: true, pattern: /^[0-9]*$/, message: '端口号为数字', trigger: 'change' }]
+			},
+			tableData: [],
+			total: 0,
+			page: 1,
+			pageSize: 20,
+			modalShow: false,
+			modalTitle: '新',
+			isAdd: true
+		}
+	},
+	created() {},
+	mounted() {
+		this.getTable()
+	},
+	watch: {
+		modalShow(val) {
+			if (!val) {
+				for (let key in this.addFormData) {
+					this.addFormData[key] = ''
+				}
+				this.addFormData.iIsEnable = '1'
+				this.$refs['add-form'].resetFields()
+			}
+		}
+	},
+	methods: {
+		// 新增、修改
+		handleModalShow(type, val) {
+			if (type) {
+				this.modalShow = true
+				this.modalTitle = '修改'
+				this.isAdd = false
+				for (let key in this.addFormData) {
+					this.addFormData[key] = val.row[key]
+				}
+				this.addFormData.iIsEnable = val.row.iIsEnable + ''
+			} else {
+				this.modalShow = true
+				this.modalTitle = '新增'
+				this.isAdd = true
+			}
+		},
+
+		// 表单提交
+		handleSaveArea() {
+			if (this.isAdd) {
+				this.$refs['add-form'].validate(valid => {
+					if (valid) {
+						let params = this.addFormData
+						this.axios.addEmqData(params).then(res => {
+							if (res.code == 200) {
+								this.getTable()
+								this.modalShow = false
+							} else {
+								this.$Message.warning(res.msg)
+							}
+						})
+					}
+				})
+			} else {
+				this.$refs['add-form'].validate(valid => {
+					if (valid) {
+						let params = this.addFormData
+						this.axios.updateEmqData(params).then(res => {
+							if (res.code == 200) {
+								this.getTable()
+								this.modalShow = false
+							} else {
+								this.$Message.warning(res.msg)
+							}
+						})
+					}
+				})
+			}
+		},
+
+		// 获取表格
+		getTable() {
+			let params = {
+				currentPage: this.page,
+				pageSize: this.pageSize
+			}
+			this.axios.getEmqList(params).then(res => {
+				if (res.code == 200) {
+					this.tableData = res.data.lists
+					this.total = res.data.page.totalNum
+				}
+			})
+		},
+
+		// 删除数据
+		handleRemove(params) {
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除所选项?',
+				onOk: () => {
+					this.axios.delEmqData(params.row.emqId).then(res => {
+						if (res.code == 200) {
+							this.getTable()
+							this.$Message.success('删除成功')
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+				},
+				onCancel: () => {}
+			})
+		},
+
+		// 取消
+		handleModalCancel() {
+			this.modalShow = false
+		},
+
+		// 分页切换
+		handleChangePage(page) {
+			this.page = page
+			this.getTable()
+		},
+		// 分页条数
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getTable()
+		}
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.emq-resource-manage {
+  width: 100%;
+  height: calc(100vh - 160px);
+  float: left;
+  display: flex;
+  flex-direction: column;
+
+  .tool-bar {
+    .btn-box {
+      .ivu-btn {
+        margin-right: 10px;
+      }
+    }
+  }
+
+  .table-content {
+    width: 100%;
+    flex: 1;
+    position: relative;
+
+    .ivu-table-wrapper {
+      width: 100%;
+      position: absolute;
+      top: 0;
+      height: calc(100% - 30px) !important;
+    }
+
+    /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+      height: calc(100% - 40px) !important;
+    }
+
+    /deep/tr.ivu-table-row-hover td {
+      background-color: #F5F7FA;
+    }
+
+    /deep/.ivu-table {
+      b {
+        color: #19be6b;
+        font-weight: 400;
+      }
+
+      p {
+        color: #ff9900;
+      }
+    }
+
+    /deep/.ivu-btn {
+      font-size: 14px;
+    }
+
+    .table-page {
+      width: 100%;
+      position: absolute;
+      bottom: -15px;
+
+      .page-content {
+        width: 800px;
+        margin-left: 50%;
+        transform: translateX(-35%);
+      }
+    }
+  }
+}
+</style>

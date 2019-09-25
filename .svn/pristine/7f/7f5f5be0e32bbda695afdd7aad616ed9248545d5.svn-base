@@ -1,0 +1,326 @@
+<template>
+	<div class="config-analysis">
+		<!-- 左侧树 -->
+		<div class="left-tree">
+			<search-tree :data="treeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索...">
+				<Icon type="ios-search" slot="suffix" />
+			</search-tree>
+		</div>
+		<div class="right-content">
+			<!-- <div class="search-bar">
+        <searche-Header-Wrapper>
+          <form-item
+            title="测点组名称"
+            type="text"
+            v-model="searchData.vcName"
+            placeholder="输入测点名称查询"
+            noMBottom
+          ></form-item>
+          <Button type="info" size="large" icon="md-search" @click="handlesearch">查询</Button>
+          <Button type="primary" size="large" icon="md-refresh" @click="handleResetData">重置</Button>
+        </searche-Header-Wrapper>
+			</div>-->
+			<!-- 表格区 -->
+			<div class="table-content">
+				<Table border ref="selection" :columns="tableColumns" :data="tableData" height="780"></Table>
+				<!-- 分页 -->
+				<div class="table-page">
+					<div class="page-content">
+						<Page
+							@on-change="handleChangePage"
+							@on-page-size-change="handleChangePageSize"
+							:total="total"
+							:current="page"
+							:page-size="pageSize"
+							show-elevator
+							show-total
+							show-sizer
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</template>
+<script>
+export default {
+	name: 'config-analysis',
+	components: {},
+	props: {},
+	data() {
+		return {
+			axios: this.$api.configAnalysis,
+			dtuId: '',
+			searchData: {
+				vcName: ''
+			},
+			treeData: [],
+			nodeTypeList: [],
+			tableColumns: [
+				{
+					title: '测点组名称',
+					key: 'vcGroupName',
+					width: 180,
+					align: 'center'
+				},
+				{
+					title: '测点名称',
+					key: 'vc_Name',
+					width: 180,
+					align: 'center'
+				},
+				{
+					title: '测点编码',
+					key: 'vcCode',
+					minWidth: 180,
+					align: 'center'
+				},
+				{
+					title: '测点类型',
+					key: 'iNodeType1',
+					width: 100,
+					align: 'center'
+				},
+				{
+					title: '单位',
+					key: 'vcUnit',
+					width: 80,
+					align: 'center'
+				},
+				{
+					title: '描述',
+					key: 'vcDesc',
+					width: 200,
+					align: 'center'
+				},
+				{
+					title: '早期预警范围',
+					key: 'vcEarlyAlarmRange',
+					minWidth: 130,
+					align: 'center'
+				},
+				{
+					title: '一般报警范围',
+					key: 'vcNormalAlarmRange',
+					minWidth: 130,
+					align: 'center'
+				},
+				{
+					title: '严重报警范围',
+					key: 'vcMainAlarmRange',
+					minWidth: 130,
+					align: 'center'
+				},
+				{
+					title: '危急报警范围',
+					key: 'vcFatalAlarmRange',
+					minWidth: 130,
+					align: 'center'
+				}
+			],
+			tableData: [],
+			total: 0,
+			page: 1,
+			pageSize: 20
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {},
+	created() {
+		this.getLocal()
+		// this.getStationTree()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		// 获取枚举
+		getLocal() {
+			this.$api.getLocalData().then(res => {
+				this.nodeTypeList = res.data.nodeTypeList
+				this.getStationTree()
+			})
+		},
+		// 获取网关树
+		getStationTree() {
+			this.axios.getTreeList({ iFlag: 3 }).then(res => {
+				if (res.code == 200 && res.data) {
+					let flgaNum = 2
+					this._forEach(res.data, true, item => {
+						item.expand = true
+						if (item.flag == flgaNum) {
+							this.dtuId = item.dtuId
+							item.selected = true
+							flgaNum = 'a'
+						}
+					})
+					this.treeData = res.data
+				}
+				this.getTable()
+			})
+		},
+		handleStationTree(data) {
+			if (data && data.length > 0) {
+				if (data[0].flag == 2) {
+					this.dtuId = data[0].id
+					this.getTable()
+				} else {
+					this.dtuId = ''
+					this.tableData = []
+				}
+			}
+		},
+		getTable(type) {
+			let params = {
+				page: {
+					currentPage: this.page,
+					pageSize: this.pageSize,
+					totalNum: null,
+					isMore: null,
+					totalPage: null,
+					startIndex: null
+				},
+				dtuId: this.dtuId
+				// acSmtypeEntity: {
+
+				// 	}
+			}
+
+			this.axios.getTableList(params).then(res => {
+				if (res.code == 200) {
+					this.tableData = res.data.lists
+					this.total = res.data.page.totalNum
+					this.tableData.forEach(item => {
+						for (let i = 0; i < this.nodeTypeList.length; i++) {
+							if (item.iNodeType == this.nodeTypeList[i].id) {
+								item.iNodeType1 = this.nodeTypeList[i].value
+							}
+						}
+					})
+				}
+			})
+		},
+		handleChangePage(page) {
+			this.page = page
+			this.getTable()
+		},
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getTable()
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.config-analysis {
+  width: 100%;
+
+  // height: calc(100vh - 160px);
+  .left-tree {
+    width: 260px;
+    height: calc(100vh - 190px) !important;
+    background-color: #fff;
+    border: 10px solid #fff;
+    overflow: auto;
+    float: left;
+  }
+
+  .right-content {
+    width: calc(100% - 270px);
+    height: 100%;
+    float: left;
+    margin-left: 10px;
+
+    // display: flex;
+    // flex-direction: column;
+    .search-bar {
+      .ivu-btn {
+        margin-right: 10px;
+      }
+
+      .search-header-wrapper .form-item span {
+        font-size: 14px;
+      }
+
+      .ivu-input-wrapper input {
+        font-size: 14px;
+      }
+    }
+
+    .table-content {
+      /deep/ .ivu-table-wrapper {
+        height: calc(100vh - 190px) !important;
+
+        .ivu-table-body, .ivu-table-overflowY, .ivu-table-tip, .ivu-table-tip td {
+          height: calc(100vh - 230px) !important;
+        }
+      }
+
+      /deep/.ivu-table {
+        p {
+          color: #19be6b;
+        }
+
+        b {
+          font-weight: 400;
+          color: #ff9900;
+        }
+
+        i {
+          font-style: normal;
+        }
+      }
+
+      /deep/tr.ivu-table-row-hover td {
+        background-color: #F5F7FA;
+      }
+
+      /deep/.ivu-btn {
+        font-size: 14px;
+      }
+
+      .table-page {
+        width: 100%;
+        height: 30px;
+        margin-top: 15px;
+
+        // position: absolute;
+        // bottom: -15px;
+        .page-content {
+          width: 800px;
+          margin-left: 50%;
+          transform: translateX(-50%);
+        }
+      }
+    }
+  }
+}
+</style>

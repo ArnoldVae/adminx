@@ -1,0 +1,338 @@
+<template>
+	<div class="template-manage">
+		<div class="tool-bar">
+			<searche-Header-Wrapper>
+				<Button type="success" size="large" icon="md-add" @click="handleadd">新增</Button>
+			</searche-Header-Wrapper>
+		</div>
+		<div class="table-content">
+			<Table border :columns="tableColumns" :data="tableData" :height="650"></Table>
+			<div class="table-page">
+				<div class="page-content">
+					<Page
+						@on-change="handleChangePage"
+						@on-page-size-change="handleChangePageSize"
+						:total="total"
+						:current="page"
+						:page-size="pageSize"
+						show-elevator
+						show-total
+						show-sizer
+					/>
+				</div>
+			</div>
+		</div>
+		<!-- <Modal v-model="modalShow" :title="modalTitle" :styles="{left:'-250px'}" :mask-closable="false"> -->
+		<Modal v-model="modalShow" :title="modalTitle" :mask-closable="false">
+			<Form
+				ref="add-form"
+				:rules="ruleValidate"
+				:model="FormData"
+				:label-width="80"
+				label-position="right"
+			>
+				<FormItem label="名称" prop="vcName">
+					<Input v-model="FormData.vcName" placeholder="请输入..." />
+				</FormItem>
+				<FormItem label="编码" prop="vcCode">
+					<Input v-model="FormData.vcCode" placeholder="请输入..." />
+					<p style="fontSize:14px">格式:T1001</p>
+				</FormItem>
+				<FormItem label="图标" prop="iCon">
+					<RadioGroup v-model="selectIcon">
+						<Radio v-for="item in dicList" :label="item.label" :value="item.label" :key="item.label">
+							{{ item.title }}
+						</Radio>
+					</RadioGroup>
+				</FormItem>
+
+				<!-- <FormItem label="模板类型" prop="image">
+					<RadioGroup v-model="selectTypeImg">
+						<Radio
+							v-for="item in dicList"
+							:label="item.label"
+							:value="item.label"
+							:key="item.label"
+						>{{ item.title }}</Radio>
+					</RadioGroup>
+				</FormItem>-->
+				<FormItem label="描述" prop="vcMemo">
+					<Input v-model="FormData.vcMemo" placeholder="请输入..." />
+				</FormItem>
+			</Form>
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button type="primary" size="large" @click="handleSaveArea">确认</Button>
+			</div>
+		</Modal>
+		<!-- <Modal
+			v-model="modalShow"
+			:mask="false"
+			:closable="false"
+			footer-hide
+			title="模板示例"
+			:styles="{left:'359px'}"
+			width="697"
+			:mask-closable="false"
+		>
+			<img
+				v-if="selectTypeImg"
+				style="width:100%"
+				:src="require(`@/assets/img/template-manage/${selectTypeImg}.png`)"
+				alt
+			/>
+		</Modal>-->
+	</div>
+</template>
+<script>
+export default {
+	name: 'template-manage',
+	components: {},
+	props: {},
+	data() {
+		return {
+			axios: this.$api.templateManage,
+			searchData: {
+				vcName: ''
+			},
+			modalShow: false,
+			modalTitle: '新增',
+			FormData: {
+				vcName: '',
+				vcCode: '',
+				vcMemo: ''
+			},
+			selectTypeImg: '',
+			selectIcon: '',
+			tableColumns: [
+				{
+					title: '名称',
+					key: 'vcName',
+					align: 'center'
+				},
+				{
+					title: '编码',
+					key: 'vcCode',
+					align: 'center',
+					width: '300px'
+				},
+				{
+					title: '图标',
+					key: 'iCon',
+					align: 'center'
+				},
+				{
+					title: '描述',
+					key: 'vcMemo',
+					align: 'center'
+				},
+				{
+					title: '操作',
+
+					key: 'action',
+					align: 'center',
+					width: 210,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										icon: 'ios-create-outline'
+									},
+									style: {
+										marginRight: '5px'
+									},
+									on: {
+										click: () => {
+											this.handleupload(params)
+										}
+									}
+								},
+								'编辑'
+							),
+							h(
+								'Button',
+								{
+									props: {
+										type: 'error',
+										icon: 'md-trash'
+									},
+									on: {
+										click: () => {
+											this.handledel(params)
+										}
+									}
+								},
+								'删除'
+							)
+						])
+					}
+				}
+			],
+			tableData: [{ vcName: '表格', vcCode: 'T1001', iCon: 'table', vcMemo: '公共表格组件' }],
+			dicList: [],
+			total: 0,
+			page: 1,
+			pageSize: 20,
+			ruleValidate: {},
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		modalShow: {
+			handler(val) {
+				if (val) {
+					this.selectTypeImg = this.dicList[0].label
+					this.selectIcon = this.dicList[0].label
+				}
+			}
+		}
+	},
+	created() {
+		this.getDict()
+		this.getEnums()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		//获取列表
+		getTable() {},
+		//获取字典数据
+		getDict() {
+			this.axios.findDicList({ dictGroupID: 1011 }).then(res => {
+				console.log(res.data)
+
+				if (res.data && res.code == 200) {
+					for (let i = 0; i < res.data.length; i++) {
+						let obj = { label: res.data[i].vcName, value: res.data[i].dictID + '', title: res.data[i].vcMemo }
+						this.dicList.push(obj)
+					}
+				}
+				console.log(this.dicList)
+			})
+		},
+		getEnums() {
+			this.$api.getLocalData('enums.json').then(res => {
+				console.log(res)
+				this.imageList = res.data.imageList
+			})
+		},
+		//新增
+		handleadd() {
+			this.modalTitle = '新增'
+			this.modalShow = true
+		},
+		//编辑
+		handleupload(row) {
+			this.modalTitle = '编辑'
+			console.log(row)
+			this.modalShow = true
+		},
+		//删除
+		handledel(data) {
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除所选项?',
+				onOk: () => {
+					console.log(data)
+				},
+				onCancel: () => {}
+			})
+		},
+		//弹窗取消
+		handleModalCancel() {
+			this.modalShow = false
+		},
+		//弹窗保存
+		handleSaveArea() {
+			let params = this.FormData
+			params.icon = this.selectIcon
+			params.typeImg = this.selectTypeImg
+
+			console.log(params)
+		},
+
+		//分页更改
+		handleChangePage() {},
+		//分页条数更改
+		handleChangePageSize() {}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.template-manage {
+  width: 100%;
+  height: calc(100vh - 160px);
+  float: left;
+  display: flex;
+  flex-direction: column;
+
+  .tool-bar {
+    .ivu-btn {
+      margin-right: 10px;
+    }
+  }
+
+  .table-content {
+    width: 100%;
+    flex: 1;
+    position: relative;
+
+    .ivu-table-wrapper {
+      width: 100%;
+      position: absolute;
+      top: 0;
+      height: calc(100% - 30px) !important;
+    }
+
+    /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+      height: calc(100% - 40px) !important;
+    }
+
+    /deep/tr.ivu-table-row-hover td {
+      background-color: #F5F7FA;
+    }
+
+    /deep/.ivu-table {
+      b {
+        color: #19be6b;
+        font-weight: 400;
+      }
+
+      p {
+        color: #ff9900;
+      }
+    }
+
+    /deep/.ivu-btn {
+      font-size: 14px;
+    }
+
+    .table-page {
+      width: 100%;
+      position: absolute;
+      bottom: -15px;
+
+      .page-content {
+        width: 800px;
+        margin-left: 50%;
+        transform: translateX(-35%);
+      }
+    }
+  }
+}
+</style>

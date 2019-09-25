@@ -1,0 +1,392 @@
+<template>
+	<div class="device-config">
+		<!-- 左侧树 -->
+		<div class="left-tree">
+			<search-tree :data="treeData" @on-select-change="handleStationTree">
+				<Icon type="ios-search" slot="suffix" />
+			</search-tree>
+		</div>
+		<div class="right-content">
+			<!-- 搜索栏 -->
+			<transition name="el-fade-in-linear">
+				<div class="search-bar" v-show="searchShow">
+					<searche-Header-Wrapper>
+						<form-item
+							title="人员名称"
+							type="text"
+							v-model="searchData.userName"
+							placeholder="输入查询"
+							@on-enter="searchStation"
+							clearable
+							noMBottom
+						></form-item>
+						<form-item
+							title="人员编号"
+							type="text"
+							v-model="searchData.vcCode"
+							placeholder="输入查询"
+							@on-enter="searchStation"
+							clearable
+							noMBottom
+						></form-item>
+						<form-item
+							title="身份证"
+							type="text"
+							v-model="searchData.idCard"
+							placeholder="输入查询"
+							@on-enter="searchStation"
+							clearable
+							noMBottom
+						></form-item>
+						<Button type="info" size="large" icon="md-search" @click="searchStation">查询</Button>
+						<!-- <Button type="primary" size="large" icon="md-refresh" @click="handleResetData">重置</Button> -->
+					</searche-Header-Wrapper>
+				</div>
+			</transition>
+
+			<!-- 表格区 -->
+			<div class="table-content">
+				<Table border ref="selection" :columns="tableColumns" :data="types=='mainPerson'?tableDatas:tableData" :height="700" @on-selection-change="selectionChange"></Table>
+				<!-- 分页 -->
+				<div class="table-page" style="text-align: center;">
+					<div class="page-content">
+						<Page
+							@on-change="handleChangePage"
+							@on-page-size-change="handleChangePageSize"
+							:total="total"
+							:current="page"
+							:page-size="pageSize"
+							show-elevator
+							show-total
+							show-sizer
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</template>
+<script>
+// import mixinTolls from '@/mixin/tools'
+export default {
+	name: 'device-config',
+	mixins: [],
+	components: {},
+	props: {
+		types: {
+			type: String
+		}
+	},
+	data() {
+		return {
+			searchShow: true, // 搜索栏显示隐藏
+			btnLoading: false,
+			treeData: [], // 左侧树数据
+			eye: 'md-eye',
+			// 搜索框搜索内容
+			searchData: {
+				vcCode: '',
+				userName: '',
+				idCard: ''
+			},
+			tableColumns: [
+				{
+					type: 'selection',
+					width: 50,
+					align: 'center'
+				},
+				{
+					title: '姓名',
+					key: 'title',
+					align: 'center',
+					width: 110
+				},
+				{
+					title: '性别',
+					key: 'gender',
+					align: 'center',
+					width: 70
+				},
+				{
+					title: '电话',
+					key: 'idCode',
+					align: 'center',
+					width: 170
+				},
+				{
+					title: '身份证',
+					key: 'idCard',
+					align: 'center',
+					width: 180
+				},
+				{
+					title: '备注',
+					key: 'vcMemo',
+					align: 'center',
+					minWidth: 140,
+					maxWidth: 250
+				}
+			],
+			tableData: [],//新增、编辑表格数据
+			tableDatas: [],//负责人表格数据
+
+			// 分页信息
+			total: 0,
+			page: 1,
+			pageSize: 20,
+
+			//判断是否是主要负责人弹窗
+			tp: '',
+			personList:[]
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		// 搜索框的显示和隐藏 更换图标
+		searchShow(val) {
+			if (val) {
+				this.eye = 'md-eye'
+			} else {
+				this.eye = 'md-eye-off'
+			}
+		}
+	},
+	created() {
+		this.getStationTree()
+		// this.getTable()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+        //表格数据选中改变
+        selectionChange(selection) {
+			if(this.types == "mainPerson") {
+				this.personList = selection
+				if (selection.length > 1) {
+				this.$Message.info({
+					content: '只能选择一行!!!',
+					duration: 3
+				})
+
+				this.personList = this.personList.filter((item, index) => {
+					return index == this.personList.length - 1
+				})
+
+			}
+				this.$emit("selectMainPerson",this.personList)
+				this.personList = []
+			} else {
+				this.$emit("addp",selection)
+			}
+        },
+
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+        },
+        
+		// 获取树结构
+		async getStationTree() {
+			let result = await this.$api.maintenancePerson.getTreeData()
+			if (result.code == 200) {
+				this._forEach(result.data, true, item => {
+					item.expand = true
+				})
+				this.treeData = result.data
+			}
+		},
+		// 左侧树点击
+		handleStationTree(data) {
+			this.getTable({deptId : data[0].id})
+		},
+		// 查询
+		searchStation() {
+			this.getTable()
+		},
+		// 重置查询
+		// handleResetData() {
+		// 	this.searchData.vcName = ''
+		// 	this.searchData.isEnable = 'all'
+		// 	this.searchData.type = 'all'
+		// 	this.getTable()
+		// },
+		// 获取表格数据
+		getTable(param) {
+			param = param? param:{}
+			let params = {
+				deptId: param.deptId,
+				vcCode: this.searchData.vcCode || param.vcCode,
+				userName: this.searchData.userName || param.userName,
+				idCard: this.searchData.idCard || param.idCard,
+				currentPage: this.page,
+				pageSize: this.pageSize
+			}
+			this.$api.maintenancePerson.getPersons(params).then(res => {
+				if (res.code == 200) {
+					if(this.types == "mainPerson") {
+						this.tableDatas = res.data
+					} else {
+						this.tableData = res.data
+					}
+					this.total = res.data.total
+				}
+			})
+		},
+
+		// 分页切换
+		handleChangePage(page) {
+			this.page = page
+			this.getTable()
+		},
+		// 分页条数
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getTable()
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.device-config {
+  width: 100%;
+  height: calc(100vh - 550px);
+
+  .left-tree {
+    width: 200px;
+    height: calc(100% - 30px);
+    background-color: #f8f8f9;
+    border: 10px solid #fff;
+    overflow: auto;
+    float: left;
+
+    /deep/ .ivu-input-wrapper {
+      display: none;
+    }
+  }
+
+  .right-content {
+    width: calc(100% - 210px);
+    height: 100%;
+    float: left;
+    margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+
+    .tool-bar {
+      .btn-box {
+        .ivu-btn {
+          margin-right: 10px;
+        }
+      }
+    }
+
+    /deep/ .content-wrap {
+      width: 130px;
+    }
+
+    .search-bar {
+      .ivu-btn {
+        margin-left: 9px!important;
+      }
+
+      .search-header-wrapper {
+        padding: 20px 10px 10px 0;
+      }
+
+      .search-header-wrapper .form-item span {
+        font-size: 14px;
+      }
+
+      .ivu-input-wrapper input {
+        font-size: 14px;
+      }
+    }
+
+    .table-content {
+      width: 100%;
+      flex: 1;
+      position: relative;
+
+      .ivu-table-wrapper {
+        width: 100%;
+        position: absolute;
+        top: 0;
+        height: calc(100% - 30px) !important;
+      }
+
+      /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+        height: calc(100% - 40px) !important;
+      }
+
+      /deep/.ivu-table {
+        p {
+          color: #19be6b;
+        }
+
+        b {
+          font-weight: 400;
+          color: #ff9900;
+        }
+
+        i {
+          font-style: normal;
+        }
+      }
+
+      /deep/tr.ivu-table-row-hover td {
+        background-color: #F5F7FA;
+      }
+
+      /deep/.ivu-btn {
+        font-size: 14px;
+      }
+
+      .table-page {
+        width: 100%;
+        position: absolute;
+        bottom: -15px;
+
+        .page-content {
+          width: 800px;
+          margin-left: 50%;
+          transform: translateX(-50%);
+        }
+      }
+    }
+  }
+}
+
+/deep/.ivu-radio-wrapper {
+  font-size: 14px !important;
+}
+
+/deep/.ivu-input-disabled {
+  color: #515a6e;
+}
+
+</style>

@@ -1,0 +1,1318 @@
+<template>
+  <div class="station-manage">
+    <!-- 左侧树 -->
+    <div class="left-tree">
+      <search-tree :data="treeData"
+                   @on-select-change="handleStationTree"
+                   placeholder="输入关键词搜索...">
+        <Icon type="ios-search"
+              slot="suffix" />
+      </search-tree>
+    </div>
+    <!-- 右侧内容 -->
+    <div class="right-content">
+      <!-- 工具栏 -->
+      <div class="tool-bar">
+        <searche-Header-Wrapper>
+          <div class="btn-box">
+            <Button type="success"
+                    size="large"
+                    icon="md-add"
+                    @click="handleModalShow(0)">新增</Button>
+            <Button type="primary"
+                    size="large"
+                    :icon="eye"
+                    @click="searchShow = !searchShow">筛选</Button>
+          </div>
+        </searche-Header-Wrapper>
+      </div>
+      <!-- 搜索栏 -->
+      <transition name="el-fade-in-linear">
+        <div class="search-bar"
+             v-show="searchShow">
+          <searche-Header-Wrapper>
+            <form-item title="配电所"
+                       type="text"
+                       v-model="searchData.vcName"
+                       placeholder="输入配电所查询"
+                       @on-enter="searchStation"
+                       clearable
+                       noMBottom></form-item>
+            <form-item title="电压等级"
+                       type="select"
+                       v-model="searchData.iVoltageLevelId"
+                       :options="cityList"
+                       :setings="{ value: 'value', label: 'label' }"
+                       noMBottom></form-item>
+
+            <Button type="info"
+                    size="large"
+                    icon="md-search"
+                    @click="searchStation">查询</Button>
+            <Button type="primary"
+                    size="large"
+                    icon="md-refresh"
+                    @click="handleResetData">重置</Button>
+            <!-- <Button type="error" size="large" icon="md-trash" @click="handleRemove(0)">批量删除</Button> -->
+          </searche-Header-Wrapper>
+        </div>
+      </transition>
+      <!-- 表格区 -->
+      <div class="table-content">
+        <Table border
+               ref="selection"
+               :columns="tableColumns"
+               :data="tableData"
+               @on-row-dblclick="dblclick"
+               :height="650"></Table>
+        <!-- 分页 -->
+        <div class="table-page">
+          <div class="page-content">
+            <Page @on-change="handleChangePage"
+                  @on-page-size-change="handleChangePageSize"
+                  :total="total"
+                  :current="page"
+                  :page-size="pageSize"
+                  show-elevator
+                  show-total
+                  show-sizer />
+          </div>
+        </div>
+      </div>
+
+      <Spin fix
+            v-if="loadingShow">
+        <Icon type="ios-loading"
+              size="18"
+              class="demo-spin-icon-load"></Icon>
+        <div>接入中 请稍后</div>
+      </Spin>
+    </div>
+
+    <!-- 新增弹窗 -->
+    <Modal v-model="modalShow"
+           :title="modalTitle"
+           class="add-modal"
+           :mask-closable="false">
+      <Form ref="add-form"
+            :rules="ruleValidate"
+            :model="addFormData"
+            :label-width="70"
+            label-position="right">
+        <!-- 配电所 -->
+        <FormItem label="配电所"
+                  prop="vcName">
+          <Input v-model="addFormData.vcName"
+                 placeholder="请输入..."
+                 style="width: 400px" />
+        </FormItem>
+        <!-- 所属组织 -->
+        <FormItem label="所属组织">
+          <Input v-model="orgTitle"
+                 :disabled="true"
+                 placeholder="请输入..."
+                 style="width: 400px" />
+        </FormItem>
+        <!-- 电压等级 -->
+        <FormItem label="电压等级">
+          <RadioGroup v-model="addFormData.iVoltageLevelId">
+            <Radio v-for="item in voltageList"
+                   :label="item.value"
+                   :value="item.value"
+                   :key="item.value">{{ item.label }}</Radio>
+          </RadioGroup>
+        </FormItem>
+        <!-- 状态 -->
+        <FormItem label="状态">
+          <RadioGroup v-model="addFormData.iIsEnable">
+            <Radio label="1"
+                   value="1">启用</Radio>
+            <Radio label="0"
+                   value="0">禁用</Radio>
+          </RadioGroup>
+        </FormItem>
+        <!-- 编码 -->
+        <FormItem label="编码"
+                  prop="vcCode">
+          <Input v-model="addFormData.vcCode"
+                 style="width: 400px"
+                 placeholder="请输入..." />
+          <p>示例:东善桥运维班.龙王山站 &nbsp;0dsq.0lws</p>
+        </FormItem>
+        <!-- 排序 -->
+        <FormItem label="排序"
+                  prop="iSort">
+          <Input v-model="addFormData.iSort"
+                 style="width: 400px"
+                 placeholder="请输入..." />
+        </FormItem>
+        <!-- 工程商 -->
+        <FormItem label="工程商">
+          <Input v-model="addFormData.vcProjectCompany"
+                 placeholder="请输入..."
+                 style="width: 400px" />
+        </FormItem>
+        <!-- 投运时间 -->
+        <FormItem label="投运时间">
+          <DatePicker type="date"
+                      v-model="addFormData.iRuntime"
+                      format="yyyy/MM/dd"
+                      placeholder="选择投运时间"
+                      style="width: 400px"></DatePicker>
+        </FormItem>
+        <!-- 接入时间 -->
+        <FormItem label="接入时间">
+          <DatePicker type="datetime"
+                      v-model="addFormData.iAccesstime"
+                      format="yyyy-MM-dd HH:mm:ss"
+                      placeholder="选择接入时间"
+                      style="width: 400px"></DatePicker>
+        </FormItem>
+        <!-- 地址 -->
+        <FormItem label="地址">
+          <Input v-model="addFormData.vcAddress"
+                 placeholder="请输入..."
+                 style="width: 400px" />
+        </FormItem>
+        <!-- 坐标 -->
+        <FormItem label="坐标"
+                  class="axis-form-item"
+                  prop="dMapx">
+          <Input type="text"
+                 v-model="addFormData.dMapx"
+                 placeholder="X 坐标" />
+          <Input type="text"
+                 v-model="addFormData.dMapy"
+                 placeholder="Y 坐标" />
+          <div class="icon-wrapper">
+            <Icon type="md-pin"
+                  @click="showMpa(0)" />
+          </div>
+        </FormItem>
+      </Form>
+
+      <div slot="footer">
+        <Button type="text"
+                size="large"
+                @click="handleModalCancel">取消</Button>
+        <Button type="primary"
+                size="large"
+                @click="handleSaveStation(0)">确认</Button>
+      </div>
+    </Modal>
+    <!-- 修改 -->
+    <Modal v-model="upModalShow"
+           :title="modalTitle"
+           class="add-modal"
+           :mask-closable="false">
+      <Form ref="up-form"
+            :rules="ruleValidate"
+            :model="upFormData"
+            :label-width="70"
+            label-position="right">
+        <!-- 配电所 -->
+        <FormItem label="配电所"
+                  prop="vcName">
+          <Input v-model="upFormData.vcName"
+                 placeholder="请输入..."
+                 style="width: 400px" />
+        </FormItem>
+        <!-- 所属组织 -->
+        <FormItem label="所属组织">
+          <treeSelect :options="upTreeData"
+                      v-model="upFormData.orgId"></treeSelect>
+        </FormItem>
+        <!-- 电压等级 -->
+        <FormItem label="电压等级">
+          <RadioGroup v-model="upFormData.iVoltageLevelId">
+            <Radio v-for="item in voltageList"
+                   :label="item.value"
+                   :value="item.value"
+                   :key="item.value">{{ item.label }}</Radio>
+          </RadioGroup>
+        </FormItem>
+        <!-- 状态 -->
+        <FormItem label="状态">
+          <RadioGroup v-model="upFormData.iIsEnable">
+            <Radio label="1"
+                   value="1">启用</Radio>
+            <Radio label="0"
+                   value="0">禁用</Radio>
+          </RadioGroup>
+        </FormItem>
+        <!-- 编码 -->
+        <FormItem label="编码"
+                  prop="vcCode">
+          <Input v-model="upFormData.vcCode"
+                 style="width: 400px"
+                 placeholder="请输入..." />
+          <p>示例:龙王山站 0dsq.0lws</p>
+        </FormItem>
+        <!-- 排序 -->
+        <FormItem label="排序"
+                  prop="iSort">
+          <Input v-model="upFormData.iSort"
+                 style="width: 400px"
+                 placeholder="请输入..." />
+        </FormItem>
+        <!-- 工程商 -->
+        <FormItem label="工程商">
+          <Input v-model="upFormData.vcProjectCompany"
+                 placeholder="请输入..."
+                 style="width: 400px" />
+        </FormItem>
+        <!-- 投运时间 -->
+        <FormItem label="投运时间">
+          <DatePicker type="date"
+                      v-model="upFormData.iRuntime"
+                      format="yyyy/MM/dd"
+                      placeholder="选择投运时间"
+                      style="width: 400px"></DatePicker>
+        </FormItem>
+        <!-- 接入时间 -->
+        <FormItem label="接入时间">
+          <DatePicker type="datetime"
+                      v-model="upFormData.iAccesstime"
+                      format="yyyy-MM-dd HH:mm:ss"
+                      placeholder="选择接入时间"
+                      style="width: 400px"></DatePicker>
+        </FormItem>
+        <!-- 地址 -->
+        <FormItem label="地址">
+          <Input v-model="upFormData.vcAddress"
+                 placeholder="请输入..."
+                 style="width: 400px" />
+        </FormItem>
+        <!-- 坐标 -->
+        <FormItem label="坐标"
+                  class="axis-form-item">
+          <Input type="text"
+                 v-model="upFormData.dMapx"
+                 placeholder="X 坐标" />
+          <Input type="text"
+                 v-model="upFormData.dMapy"
+                 placeholder="Y 坐标" />
+          <div class="icon-wrapper">
+            <Icon type="md-pin"
+                  @click="showMpa(1)" />
+          </div>
+        </FormItem>
+      </Form>
+
+      <div slot="footer">
+        <Button type="text"
+                size="large"
+                @click="handleModalCancel">取消</Button>
+        <Button type="primary"
+                size="large"
+                @click="handleSaveStation(0)">确认</Button>
+      </div>
+    </Modal>
+    <!-- 接入网关列表弹窗 -->
+    <Modal v-model="linkStationShow"
+           title="接入网关"
+           class="station-modal"
+           :mask-closable="false">
+      <ul v-if="stationIsOk">
+        {{
+				isPlaceholder
+				}}
+        <li v-for="(item, index) in stationList"
+            :key="index"
+            :class="{ 'list-active': item.isActive }"
+            @click="handleClickStation(item)">{{ item.vcName }}</li>
+      </ul>
+      <div slot="footer">
+        <Button type="text"
+                size="large"
+                @click="linkStationShow = false">取消</Button>
+        <Button type="primary"
+                size="large"
+                @click="handleLinkStationSave">确认</Button>
+      </div>
+    </Modal>
+    <maps :showM="showM"
+          :isAdd="isAdd"
+          :mapXy="mapXy"
+          @locations="locations"></maps>
+  </div>
+</template>
+<script>
+import { async } from 'q'
+import maps from '../station-manage/newMap'
+import mixinTolls from '@common/mixin/tools'
+import TreeSelect from '_b/tree-select'
+export default {
+	name: 'station-manage',
+	mixins: [mixinTolls],
+	components: {
+		maps,
+		TreeSelect
+	},
+	props: {},
+	data() {
+		return {
+			showM: false,
+			mapXy: {},
+			axios: this.$api.stationManage,
+			http: this.$api.distributionManage,
+			searchShow: true,
+			eye: 'md-eye',
+			mapShow: false,
+			// 树数据
+			treeData: [],
+			// 查询条件数据
+			searchData: {
+				vcName: '',
+				iVoltageLevelId: 'all'
+			},
+			cityList: [
+				// 搜索下拉框
+				{
+					value: 'all',
+					label: '全部'
+				}
+			],
+			// 表格
+			tableColumns: [
+				{
+					title: '所属组织',
+					key: 'orgName',
+					width: '150',
+					align: 'center'
+				},
+				{
+					title: '配电所',
+					key: 'vcName',
+					width: '160',
+					align: 'center'
+				},
+				{
+					title: '编码',
+					key: 'vcCode',
+					align: 'center',
+					width: 150
+				},
+				{
+					title: '电压等级',
+					key: 'iVoltageLevelId1',
+					width: '100',
+					align: 'center'
+				},
+				{
+					title: '工程商',
+					key: 'vcProjectCompany',
+					width: '100',
+					align: 'center'
+				},
+				{
+					title: '接入时间',
+					key: 'AccessTime',
+					width: '180',
+					align: 'center'
+				},
+				{
+					title: '投运时间',
+					key: 'RunTime',
+					width: '120',
+					align: 'center'
+				},
+
+				{
+					title: '状态',
+					key: 'iIsEnable1',
+					align: 'center',
+					width: '70',
+					render: (h, params) => {
+						return h('div', [params.row.iIsEnable == '1' ? h('p', params.row.iIsEnable1) : h('b', params.row.iIsEnable1)])
+					}
+				},
+				{
+					title: '地址',
+					key: 'vcAddress',
+					align: 'center',
+					minWidth: 150
+				},
+				{
+					title: '坐标',
+					key: 'coordinates',
+					width: 160,
+					align: 'center'
+				},
+				{
+					title: '排序',
+					key: 'iSort',
+					align: 'center',
+					width: 70
+				},
+				{
+					title: '操作',
+					key: 'action',
+					align: 'center',
+					width: 325,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'info',
+										icon: 'md-link'
+									},
+									style: {
+										marginRight: '5px'
+									},
+									on: {
+										click: () => {
+											this.handleLinkStation(params)
+										}
+									}
+								},
+								'接入网关'
+							),
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										icon: 'ios-create-outline'
+									},
+									style: {
+										marginRight: '5px'
+									},
+									on: {
+										click: () => {
+											this.handleModalShow(1, params)
+										}
+									}
+								},
+								'编辑'
+							),
+
+							h(
+								'Button',
+								{
+									props: {
+										type: 'error',
+										icon: 'md-trash'
+									},
+									on: {
+										click: () => {
+											this.handleRemove(1, params)
+										}
+									}
+								},
+								'删除'
+							)
+						])
+					}
+				}
+			],
+			// 表格数据
+			tableData: [],
+			// 表单验证
+			ruleValidate: {
+				vcName: [{ required: true, message: '该项为必填项', trigger: 'blur' }, { pattern: /^.{0,255}$/, message: '最多输入256字', trigger: 'change' }],
+				vcCode: [{ required: true, message: '该项为必填项', trigger: 'blur' }, { pattern: /^.{0,63}$/, message: '最多输入64字', trigger: 'change' }],
+				iSort: [{ pattern: /^[0-9]\d{0,3}$/, message: '请正确输入排序数字', trigger: 'change' }]
+			},
+			// 添加的表单数据
+			addFormData: {
+				vcName: '',
+				orgId: '',
+				iType: 1,
+				iVoltageLevelId: '0',
+				vcCode: '',
+				iSort: '0',
+				iIsEnable: '1',
+				vcProjectCompany: '',
+				iAccesstime: '',
+				iRuntime: '',
+				vcAddress: '',
+				dMapx: '',
+				dMapy: '',
+				iParam1: '',
+				iParam2: '',
+				vcParam1: '',
+				vcParam2: '',
+				vcParam3: '',
+				iFlag: '1',
+				vcMemo: ''
+			},
+			// 修改的表单数据
+			upFormData: {
+				vcName: '',
+				orgId: '',
+				iType: 1,
+				org: '',
+				iVoltageLevelId: '0',
+				vcCode: '',
+				iSort: '',
+				iIsEnable: '0',
+				vcProjectCompany: '',
+				iAccesstime: '',
+				iRuntime: '',
+				vcAddress: '',
+				dMapx: '',
+				dMapy: '',
+				iParam1: '',
+				iParam2: '',
+				vcParam1: '',
+				vcParam2: '',
+				vcParam3: '',
+				iFlag: '1',
+				vcMemo: ''
+			},
+			// 接入站所表格
+			linkColumns: [
+				{
+					title: '配电所',
+					key: 'vcName',
+					align: 'center'
+				}
+			],
+			// 接入站所表格数据
+			stationList: [],
+			voltageList: [], // 电压等级字典组
+			linkData: null, // 点击选中的站点
+			stationUnitId: null, // 点击的站点unitId
+			loadingShow: false,
+			orgTitle: '',
+			orgId: '',
+			upTreeData: [], // 修改的区域树
+			upTreeActive: null,
+			removeList: [], // 批量删除
+			modalShow: false,
+			upModalShow: false,
+			linkStationShow: false,
+			stationIsOk: true,
+			isPlaceholder: '', // 弹窗无数据展示
+			modalTitle: '新增',
+			isTree: true, // 判断有没有点击树
+			isAdd: true, // 判断新增还是修改 设置禁用
+			unitId: null,
+			pageFlag: false,
+			page: 1,
+			pageSize: 20,
+			total: 0
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		modalShow(val) {
+			// 监听弹窗关闭 关闭后重置弹窗内容
+			if (!val) {
+				for (let k in this.addFormData) {
+					if (this.addFormData[k] != 'orgId') {
+						this.addFormData[k] = ''
+					}
+				}
+				// this.addFormData.iVoltageLevelId = '0'
+				this.addFormData.iVoltageLevelId = this.voltageList[0].value
+				this.addFormData.iIsEnable = '1'
+				this.addFormData.iType = 1
+				this.addFormData.iSort = '0'
+				this.$refs['add-form'].resetFields()
+				this.$refs['up-form'].resetFields()
+			}
+		},
+		searchShow(val) {
+			if (val) {
+				this.eye = 'md-eye'
+			} else {
+				this.eye = 'md-eye-off'
+			}
+		},
+		mapShow(val) {
+			if (!val) {
+				this.location.lng = ''
+				this.location.lat = ''
+				this.zuobiao = ''
+			}
+		},
+
+		searchData: {
+			handler(newVal) {
+				// if (newVal.vcName == '' && newVal.iVoltageLevelId == 'all') {
+				this.pageFlag = false
+				// }
+			},
+			deep: true
+		}
+	},
+	created() {
+		this.getStationTree()
+		this.findDic()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		// 接收地图传递过来的坐标
+		locations(location) {
+			if (this.upModalShow) {
+				this.upFormData.dMapx = location.lng
+				this.upFormData.dMapy = location.lat
+			} else if (this.modalShow) {
+				this.addFormData.dMapx = location.lng
+				this.addFormData.dMapy = location.lat
+			}
+		},
+		// 递归
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		// 获取组织树
+		async getStationTree() {
+			let result = await this.http.getUnitTree({ iFlag: 0 })
+			if (result.code == 200) {
+				this._forEach(result.data, true, item => {
+					item.expand = true
+				})
+				this.treeData = result.data
+				// this.addFormData.orgId = result.data[0].id
+				this.orgId = result.data[0].id
+				this.getStationTable()
+			}
+		},
+		// 站点树点击事件
+		handleStationTree(data) {
+			if (data && data.length) {
+				this.orgTitle = data[0].title
+				// this.addFormData.orgId = data[0].id
+				this.orgId = data[0].id
+				this.isTree = false
+				this.getStationTable()
+			}
+		},
+		// 查询
+		searchStation() {
+			if (this.searchData.vcName == '' && this.searchData.iVoltageLevelId == 'all') {
+				this.pageFlag = false
+			} else {
+				this.pageFlag = true
+			}
+			this.getStationTable()
+		},
+		// 重置查询
+		handleResetData() {
+			for (let i in this.searchData) {
+				this.searchData.vcName = ''
+				this.searchData.iVoltageLevelId = 'all'
+				this.getStationTable()
+			}
+		},
+		// 添加/修改按钮
+		handleModalShow(data, params) {
+			data == 0 ? (this.modalTitle = '新增') : (this.modalTitle = '修改')
+			data == 0 ? (this.isAdd = true) : (this.isAdd = false)
+			if (data == 0) {
+				if (!this.isTree) {
+					this.modalShow = true
+					let date = new Date()
+					this.addFormData.iAccesstime = date
+				} else {
+					this.$Message.warning('请选择左侧运维班')
+				}
+			} else {
+				this.upTreeData = JSON.parse(JSON.stringify(this.treeData))
+				this.upTreeActive = params.row.unitId
+				// console.log(params)
+				this.upFormData.iAccesstime = params.row.iAccesstime && params.row.iAccesstime != 0 ? this.strToGmt(params.row.iAccesstime * 1000) : ''
+				this.upFormData.iRuntime = params.row.iRuntime && params.row.iRuntime != 0 ? this.strToGmt(params.row.iRuntime * 1000) : ''
+				this.upFormData.vcName = params.row.vcName
+				this.upFormData.orgId = params.row.orgId
+				this.upFormData.iVoltageLevelId = params.row.iVoltageLevelId
+				this.upFormData.iIsEnable = params.row.iIsEnable
+				this.upFormData.vcProjectCompany = params.row.vcProjectCompany
+				this.upFormData.vcAddress = params.row.vcAddress
+				this.upFormData.dMapx = params.row.x != 0 ? params.row.x : ''
+				this.upFormData.dMapy = params.row.y != 0 ? params.row.y : ''
+				this.upFormData.unitId = params.row.unitId
+				this.upFormData.iSort = params.row.iSort - 0
+				this.upFormData.vcCode = params.row.vcCode
+				this.mapXy.dMapx = this.upFormData.dMapx
+				this.mapXy.dMapy = this.upFormData.dMapy
+				this.upModalShow = true
+
+				this.axios.getStationById(JSON.stringify({ unitId: params.row.unitId })).then(res => {
+					if (res.code == 200) {
+						this.orgTitle = res.data.orgName
+					} else {
+						this.orgTitle = ''
+					}
+				})
+			}
+		},
+		// 双击表格修改弹窗
+		dblclick(row) {
+			let data = {
+				row: row
+			}
+			this.handleModalShow(1, data)
+		},
+		// 获取表格数据
+		async getStationTable() {
+			let params = {
+				orgId: this.orgId,
+				vcName: this.searchData.vcName,
+				iVoltageLevelId: this.searchData.iVoltageLevelId == 'all' ? '' : this.searchData.iVoltageLevelId,
+				page: {
+					currentPage: this.page,
+					pageSize: this.pageSize
+				}
+			}
+			if (!this.pageFlag) {
+				params.vcName = ''
+				params.iVoltageLevelId = ''
+			}
+			let result = await this.http.getStationList(JSON.stringify(params))
+			if (result.code == 200) {
+				result.data.lists.forEach(item => {
+					item.AccessTime = item.iAccesstime && item.iAccesstime != 0 ? this.strToymd1(item.iAccesstime) : ''
+					item.RunTime = item.iRuntime && item.iRuntime != 0 ? this.strToymd(item.iRuntime) : ''
+					item.x = item.dMapx && item.dMapx != 0 ? (item.dMapx - 0).toFixed(4) : ''
+					item.y = item.dMapy && item.dMapy != 0 ? (item.dMapy - 0).toFixed(4) : ''
+					item.coordinates = item.x + ' / ' + item.y
+					// 电压等级
+					for (let i = 0; i < this.voltageList.length; i++) {
+						if (item.iVoltageLevelId == this.voltageList[i].value) {
+							item.iVoltageLevelId1 = this.voltageList[i].label
+						}
+					}
+					// 启用禁用
+					item.iIsEnable1 = item.iIsEnable == 1 ? '启用' : item.iIsEnable == 0 ? '禁用' : item.iIsEnable
+				})
+				this.tableData = result.data.lists
+				this.total = result.data.page.totalNum
+			}
+		},
+		// 弹窗保存
+		handleSaveStation(data) {
+			let params = {}
+			if (this.isAdd) {
+				// 新增
+				this.validateForm('add-form', () => {
+					if (this.addFormData.vcName) {
+						let reg = new RegExp(/^[0-9]+([.]{1}[0-9]+){0,1}$/)
+						if (
+							(reg.test(this.addFormData.dMapx) && reg.test(this.addFormData.dMapy)) ||
+							(this.addFormData.dMapy == '' && this.addFormData.dMapx == '')
+						) {
+							params = JSON.parse(JSON.stringify(this.addFormData))
+							let access = this.GMTToStr1(params.iAccesstime)
+							let runTime = this.GMTToStr(params.iRuntime)
+							params.iAccesstime = new Date(access).getTime() / 1000
+							params.iRuntime = new Date(runTime).getTime() / 1000
+							params.orgId = this.orgId
+							// params.iSort = this.total
+
+							this.http.saveStation(JSON.stringify(params)).then(res => {
+								if (res.code == 200) {
+									this.modalShow = false
+									this.upModalShow = false
+									this.$Message.success('保存成功')
+									this.getStationTable()
+								} else {
+									this.$Message.warning(res.msg)
+								}
+							})
+						} else {
+							this.$Message.warning('请正确输入坐标')
+						}
+					} else {
+						this.$Message.warning('请输入配电所')
+					}
+				})
+			} else {
+				// 修改
+				this.validateForm('up-form', () => {
+					let reg = new RegExp(/^[0-9]+([.]{1}[0-9]+){0,1}$/)
+					if ((reg.test(this.upFormData.dMapx) && reg.test(this.upFormData.dMapy)) || (this.upFormData.dMapy == '' && this.upFormData.dMapx == '')) {
+						params = JSON.parse(JSON.stringify(this.upFormData))
+						let access = this.GMTToStr1(params.iAccesstime)
+						let runTime = this.GMTToStr(params.iRuntime)
+						params.iAccesstime = params.iAccesstime ? new Date(access).getTime() / 1000 : 0
+						params.iRuntime = params.iRuntime ? new Date(runTime).getTime() / 1000 : 0
+						params.dMapx = params.dMapx ? params.dMapx : 0
+						params.dMapy = params.dMapy ? params.dMapy : 0
+						console.log(params)
+						this.http.updateStation(JSON.stringify(params)).then(res => {
+							if (res.code == 200) {
+								this.modalShow = false
+								this.upModalShow = false
+								this.$Message.success('修改成功')
+								this.getStationTable()
+							} else {
+								this.$Message.warning(res.msg)
+							}
+						})
+					} else {
+						this.$Message.warning('请正确输入坐标')
+					}
+				})
+			}
+		},
+		// 弹窗取消
+		handleModalCancel() {
+			this.modalShow = false
+			this.upModalShow = false
+		},
+		// 删除
+		handleRemove(data, params) {
+			if (data == 1) {
+				// 单个删除
+				this.$Modal.confirm({
+					title: '删除',
+					content: '确认删除所选项?',
+					onOk: () => {
+						let removeData = [
+							{
+								unitId: params.row.unitId
+							}
+						]
+						this.http.delStation(JSON.stringify(removeData)).then(res => {
+							if (res.code == 200 && res.success) {
+								this.getStationTable()
+								this.$Message.success('删除成功')
+							} else {
+								this.$Message.warning(res.msg)
+							}
+						})
+					},
+					onCancel: () => {}
+				})
+			} else {
+				// 批量删除
+				if (this.removeList.length > 0) {
+					this.$Modal.confirm({
+						title: '删除',
+						content: '确认删除所选项?',
+						onOk: () => {
+							this.axios.delStation(JSON.stringify(this.removeList)).then(res => {
+								if (res.code == 200 && res.success) {
+									this.getStationTable()
+									this.$Message.success('删除成功')
+									this.removeList = []
+								} else {
+									this.$Message.warning(res.msg)
+								}
+							})
+						},
+						onCancel: () => {}
+					})
+				} else {
+					this.$Message.warning('请选择删除项')
+				}
+			}
+		},
+		// GMT转STR
+		GMTToStr(time) {
+			let date = new Date(time)
+			let Str = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
+			return Str
+		},
+		GMTToStr1(time) {
+			let date = new Date(time)
+			let Str =
+				date.getFullYear() +
+				'-' +
+				(date.getMonth() + 1) +
+				'-' +
+				date.getDate() +
+				' ' +
+				date.getHours() +
+				':' +
+				date.getMinutes() +
+				':' +
+				date.getSeconds()
+			return Str
+		},
+		// ymd转GMT
+		strToGmt(dataTime) {
+			var timestamp = dataTime
+			var newDate = new Date(dataTime + 8 * 3600 * 1000)
+			return newDate.toISOString()
+		},
+		// 时间戳转ymd
+		strToymd(time, up) {
+			// 遍历时间 处理格式
+			let date = new Date(time * 1000)
+			let Y = date.getFullYear() + '-'
+			let M = (date.getMonth() + 1 < 10 ? '0' + (date.getMonth() + 1) : date.getMonth() + 1) + '-'
+			let D = date.getDate() + ''
+			let h = date.getHours() + ':'
+			let m = date.getMinutes() + ':'
+			let s = date.getSeconds()
+			let b = Y + M + D
+			return b
+		},
+		strToymd1(time, up) {
+			// 遍历时间 处理格式
+			let date = new Date(time * 1000)
+			let Y = date.getFullYear() + '-'
+			let M = (date.getMonth() + 1 < 10 ? '0' + (date.getMonth() + 1) : date.getMonth() + 1) + '-'
+			let D = date.getDate() + ' '
+			let h = date.getHours() + ':'
+			let m = date.getMinutes() + ':'
+			let s = date.getSeconds()
+			let b = Y + M + D + h + m + s
+			return b
+		},
+
+		// 全选
+		handleSelectAll(selection) {
+			this.removeList = []
+			if (selection.length > 0) {
+				for (let i = 0; i < selection.length; i++) {
+					let obj = {}
+					obj.unitId = selection[i].unitId
+					this.removeList.push(obj)
+				}
+			}
+		},
+		// 分页切换
+		handleChangePage(page) {
+			this.page = page
+			this.getStationTable()
+		},
+		// 分页条数
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getStationTable()
+		},
+		// 地图弹窗
+		showMpa() {
+			this.showM = !this.showM
+		},
+		// 接入站所按钮点击
+		handleLinkStation(params) {
+			this.linkData = null
+			this.stationUnitId = params.row.unitId
+			this.linkStationShow = true
+			this.axios.getStation({ isUnit: 1 }).then(res => {
+				if (res.code == 200 && res.data.length > 0) {
+					this.stationList = res.data
+					this.isPlaceholder = ''
+				} else {
+					this.isPlaceholder = '暂无数据'
+				}
+			})
+			if (this.stationList.length == 0) {
+				this.isPlaceholder = '暂无数据'
+			} else {
+				this.isPlaceholder = ''
+			}
+		},
+		// 接入站所弹窗点击配电所
+		handleClickStation(data) {
+			this.stationList.forEach(item => {
+				item.isActive = false
+				if (item.dtuId == data.dtuId) {
+					item.isActive = true
+				}
+			})
+			this.stationIsOk = false
+			this.stationIsOk = true
+			this.linkData = data
+		},
+		// 接入站所弹窗确定
+		handleLinkStationSave() {
+			if (this.linkData && this.stationUnitId) {
+				let params = {
+					dtuId: this.linkData.dtuId,
+					unitId: this.stationUnitId
+				}
+				this.linkStationShow = false
+				this.loadingShow = true
+				this.axios.linkStation(params).then(res => {
+					if (res.code == 200) {
+						this.stationUnitId = null
+						this.loadingShow = false
+						this.$Message.success('接入成功')
+					} else {
+						this.loadingShow = false
+						this.$Message.error(res.msg)
+					}
+				})
+			} else {
+				this.$Message.warning('请选择接入的配电所')
+			}
+		},
+		// 查询字典组
+		findDic() {
+			this.axios.findDicList({ dictGroupID: 1001 }).then(res => {
+				if (res.data && res.code == 200) {
+					for (let i = 0; i < res.data.length; i++) {
+						// let obj = { label: res.data[i].vcName, value: i + '' }
+						let obj = { label: res.data[i].vcName, value: res.data[i].dictID + '' }
+						this.voltageList.push(obj)
+						this.cityList.push(obj)
+					}
+					this.addFormData.iVoltageLevelId = this.voltageList[0].value
+					// console.log(res.data)
+				}
+			})
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.station-manage {
+  width: 100%;
+  height: calc(100vh - 160px);
+
+  .left-tree {
+    width: 230px;
+    height: calc(100% - 30px);
+    background-color: #fff;
+    border: 10px solid #fff;
+    overflow: auto;
+    float: left;
+  }
+
+  .right-content {
+    width: calc(100% - 250px);
+    height: 100%;
+    float: left;
+    margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+
+    .tool-bar {
+      .btn-box {
+        .ivu-btn {
+          margin-right: 10px;
+        }
+      }
+    }
+
+    .search-bar {
+      .ivu-btn {
+        margin-right: 10px;
+      }
+
+      .search-header-wrapper .form-item span {
+        font-size: 14px;
+      }
+
+      .ivu-input-wrapper input {
+        font-size: 14px;
+      }
+    }
+
+    .table-content {
+      width: 100%;
+
+      // flex: 1;
+      // position: relative;
+      /deep/ .ivu-table-wrapper {
+        // width: 100%;
+        // position: absolute;
+        // top: 0;
+        height: calc(100vh - 340px) !important;
+
+        .ivu-table-body, .ivu-table-overflowY, .ivu-table-tip, .ivu-table-tip td {
+          height: calc(100vh - 380px) !important;
+        }
+      }
+
+      /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+        height: calc(100% - 40px) !important;
+      }
+
+      /deep/tr.ivu-table-row-hover td {
+        background-color: #F5F7FA;
+      }
+
+      /deep/.ivu-btn {
+        font-size: 14px;
+      }
+
+      .table-page {
+        width: 100%;
+        // position: absolute;
+        margin-top: 15px;
+        bottom: -15px;
+
+        .page-content {
+          width: 800px;
+          margin-left: 50%;
+          transform: translateX(-35%);
+        }
+      }
+    }
+
+    /deep/.ivu-table {
+      p {
+        color: #19be6b;
+      }
+
+      b {
+        font-weight: 400;
+        color: #ff9900;
+      }
+    }
+
+    .ivu-spin-fix {
+      z-index: 999;
+
+      /deep/.ivu-spin-text {
+        font-size: 22px;
+
+        /deep/i {
+          font-size: 30px !important;
+        }
+      }
+    }
+
+    .demo-spin-icon-load {
+      animation: ani-demo-spin 1s linear infinite;
+    }
+
+    @keyframes ani-demo-spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      50% {
+        transform: rotate(180deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .demo-spin-col {
+      height: 100px;
+      position: relative;
+      border: 1px solid #eee;
+    }
+  }
+}
+
+.axis-form-item {
+  .icon-wrapper {
+    width: 80px;
+    height: 32px;
+    flex-align(center, center);
+    margin-left: 10px;
+
+    .ivu-icon {
+      font-size: 24px;
+      cursor: pointer;
+
+      &:hover {
+        color: #2d8cf0;
+      }
+    }
+  }
+
+  /deep/.ivu-form-item-content {
+    display: flex;
+
+    .ivu-input-wrapper {
+      &:first-of-type {
+        margin-right: 10px;
+      }
+    }
+  }
+}
+
+/deep/.ivu-radio-wrapper {
+  font-size: 14px !important;
+}
+
+#allmap {
+  height: 100%;
+  overflow: hidden;
+}
+
+.location-foter {
+  .title-box {
+    float: left;
+    font-size: 18px;
+    color: #000;
+    margin-left: 50%;
+    transform: translateX(-50%);
+
+    span {
+      margin-right: 100px;
+    }
+  }
+}
+
+.add-modal {
+  /deep/.ivu-modal {
+    top: 50px;
+  }
+}
+
+.station-modal {
+  /deep/.ivu-modal-body {
+    height: 500px;
+    overflow: hidden;
+  }
+
+  padding: 10px;
+
+  ul {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 20px;
+    overflow: auto;
+    margin: 0;
+    padding: 0;
+
+    li {
+      list-style: none;
+      width: 100%;
+      height: 40px;
+      line-height: 40px;
+      font-size: 18px;
+      text-align: center;
+      border-radius: 10px;
+      border-bottom: 1px solid #dcdee2;
+      cursor: pointer;
+
+      &:hover {
+        background: #e8eaec;
+      }
+    }
+
+    .list-active {
+      background: #2d8cf0 !important;
+      color: #fff;
+    }
+  }
+}
+</style>

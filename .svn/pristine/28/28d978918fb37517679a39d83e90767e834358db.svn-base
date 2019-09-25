@@ -1,0 +1,31 @@
+[{
+        "vcName": "素材1",
+        "devId": "dev1",
+        "vcIcon": ""
+    },
+    {
+        "vcName": "素材2",
+        "devId": "dev2",
+        "vcIcon": ""
+    },
+    {
+        "vcName": "素材3",
+        "devId": "dev3",
+        "vcIcon": ""
+    },
+    {
+        "vcName": "素材4",
+        "devId": "dev4",
+        "vcIcon": ""
+    },
+    {
+        "vcName": "素材5",
+        "devId": "dev5",
+        "vcIcon": ""
+    },
+    {
+        "vcName": "素材6",
+        "devId": "dev6",
+        "vcIcon": ""
+    }
+]

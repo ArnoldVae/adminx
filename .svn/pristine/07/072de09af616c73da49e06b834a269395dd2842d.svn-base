@@ -1,0 +1,763 @@
+<template>
+	<div class="fire-part">
+		<!-- 左侧树 -->
+		<div class="left-tree">
+			<search-tree :data="treeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索...">
+				<Icon type="ios-search" slot="suffix" />
+			</search-tree>
+		</div>
+		<div class="right-content">
+			<div class="tool-bar">
+				<searche-Header-Wrapper>
+					<div class="btn-box">
+						<Button type="success" size="large" icon="md-add" @click="handleModalShow(0)">新增</Button>
+						<!-- <Button type="success" size="large" icon="md-cloud-upload" @click="handleUploadBtn(0)">导入SVG</Button> -->
+					</div>
+				</searche-Header-Wrapper>
+			</div>
+
+			<!-- 表格区 -->
+			<div class="table-content">
+				<Table border ref="selection" :columns="tableColumns" :data="tableData" height="650"></Table>
+				<!-- 分页 -->
+				<div class="table-page">
+					<div class="page-content">
+						<Page
+							@on-change="handleChangePage"
+							@on-page-size-change="handleChangePageSize"
+							:total="total"
+							:current="page"
+							:page-size="pageSize"
+							show-elevator
+							show-total
+							show-sizer
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- <Modal v-model="modalShow" title="文件上传" :mask-closable="false">
+			<div class="upload-content">
+				<Steps class="steps" :current="step" title="文件上传步骤">
+					<Step title="步骤一" content="择上传文件 (支持.svg格式的文件)"></Step>
+					<Step title="步骤二" content="选择完毕后点击 '上传' 按钮进行上传"></Step>
+					<Step title="步骤三" content="等待上传完成"></Step>
+				</Steps>
+				<Upload type="drag" :before-upload="handleUpload" action :accept="accept" :format="Format">
+					<div style="padding: 20px 0">
+						<Icon type="ios-add-circle-outline" size="52" style="color: #3399ff"></Icon>
+						<p>选择上传文件</p>
+					</div>
+				</Upload>
+				<div v-if="file !== null" class="up-box">
+					待上传文件:
+					<span>
+						<div class="del" @click="removeFile">
+		<Icon type="md-trash" />-->
+		<!-- <i class="el-icon-delete"></i>
+						</div>
+						{{ file.name }}
+					</span>
+				</div>
+			</div>
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button
+					class="btn2"
+					type="success"
+					size="large"
+					icon="md-cloud-upload"
+					@click="upload"
+					:loading="loadingStatus"
+				>
+					{{
+					loadingStatus ? '文件上传中 请稍后...' : '上传'
+					}}
+				</Button>
+			</div>
+		</Modal>-->
+
+		<!-- 新增弹窗 -->
+		<Modal
+			v-model="modalAddShow"
+			:title="modalTitle"
+			class="add-modal"
+			:mask-closable="false"
+			@on-visible-change="close"
+		>
+			<Form
+				ref="addFormRef"
+				:rules="ruleValidate"
+				:model="addFormData"
+				:label-width="100"
+				label-position="right"
+			>
+				<!-- 消防名称 -->
+				<FormItem label="消防名称" prop="vcName">
+					<Input v-model="addFormData.vcName" placeholder="请输入..." style="width: 370px" />
+				</FormItem>
+				<!-- 单位编号 -->
+				<FormItem label="单位编号" prop="vcCode">
+					<Input v-model="addFormData.vcCode" placeholder="请输入..." style="width: 370px" />
+				</FormItem>
+				<!-- 消防电话 -->
+				<FormItem label="消防电话" prop="vcTelephone">
+					<Input v-model="addFormData.vcTelephone" placeholder="请输入..." style="width: 370px" />
+				</FormItem>
+				<!-- 消防单位地址 -->
+				<FormItem label="单位地址" prop="vcAddress">
+					<Input v-model="addFormData.vcAddress" placeholder="请输入..." style="width: 370px" />
+				</FormItem>
+				<!-- 消防单位照片 -->
+				<FormItem label="消防单位照片">
+					<Upload
+						action
+						:before-upload="handleUpload"
+						:accept="accept"
+						:on-format-error="handleFormatError"
+					>
+						<Button icon="ios-cloud-upload-outline">上传消防单位照片</Button>
+					</Upload>
+					<div v-if="file !== null" class="up-box">
+						待上传文件:
+						<span>
+							<div class="del" @click="removeFile">
+								<!-- <Icon type="md-trash" /> -->
+								<i class="el-icon-delete"></i>
+							</div>
+							{{ file.name }}
+						</span>
+					</div>
+				</FormItem>
+				<!-- 坐标 -->
+				<FormItem label="坐标" class="axis-form-item" prop="dMapx">
+					<Input type="text" v-model="addFormData.mapx" placeholder="X 坐标" />
+					<Input type="text" v-model="addFormData.mapy" placeholder="Y 坐标" />
+					<div class="icon-wrapper">
+						<Icon type="md-pin" @click="showMpa(0)" />
+					</div>
+				</FormItem>
+			</Form>
+
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button type="primary" size="large" @click="handleSaveStation(0)">确认</Button>
+			</div>
+		</Modal>
+
+		<maps :showM="showM" :isAdd="isAdd" :mapXy="mapXy" @locations="locations"></maps>
+	</div>
+</template>
+<script>
+import { clearInterval } from 'timers'
+import maps from './newMap'
+export default {
+	name: 'fire-part',
+	components: { maps },
+	props: {},
+	data() {
+		//手机号码自定义验证
+		const validatePass = (rule, value, callback) => {
+			let telephone = /^1[3456789]\d{9}$/
+			if (telephone.test(value)) {
+				return callback()
+			} else {
+				callback(new Error('请输入合法的手机号码'))
+			}
+		}
+
+		return {
+			isAdd: true, // 判断新增还是修改 设置禁用
+			showM: false,
+			mapXy: {},
+			axios: this.$api.firePart,
+			treeData: [],
+			unitId: '',
+			orgId: '',
+			isTree: false,
+			isFile: false,
+			stationName: '',
+			modalShow: false,
+			modalAddShow: false,
+			step: 0,
+			file: null,
+			loadingStatus: false,
+			accept: '.png',
+			Format: ['.png', '.jpg'],
+			tableColumns: [
+				{
+					title: '消防名称',
+					key: 'vcName',
+					align: 'center',
+					maxWidth: 300
+				},
+				{
+					title: '单位编号',
+					key: 'vcCode',
+					align: 'center',
+					minWidth: 100
+				},
+				{
+					title: '消防电话',
+					key: 'vcTelephone',
+					width: 200,
+					align: 'center'
+				},
+				{
+					title: '单位地址',
+					key: 'vcAddress',
+					align: 'center',
+					minWidth: 150
+				},
+				{
+					title: '操作',
+
+					key: 'action',
+					align: 'center',
+					width: 230,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										icon: 'ios-create-outline'
+									},
+									on: {
+										click: () => {
+											this.handleModalShow(1, params)
+										}
+									}
+								},
+								'编辑'
+							),
+							h(
+								'Button',
+								{
+									props: {
+										type: 'error',
+										icon: 'md-trash'
+									},
+									on: {
+										click: () => {
+											this.handleRemove(1, params)
+										}
+									}
+								},
+								'删除'
+							)
+						])
+					}
+				}
+			],
+			tableData: [],
+			// 表单验证
+			ruleValidate: {
+				vcName: [{ required: true, message: '该项为必填项', trigger: 'blur' }, { pattern: /^.{0,100}$/, message: '最多输入100字', trigger: 'change' }],
+				vcCode: [{ required: true, message: '该项为必填项', trigger: 'blur' }, { pattern: /^.{0,100}$/, message: '最多输入100字', trigger: 'change' }],
+				vcAddress: [
+					{ required: true, message: '该项为必填项', trigger: 'blur' },
+					{ pattern: /^.{0,100}$/, message: '最多输入100字', trigger: 'change' }
+				],
+				vcTelephone: [{ required: true, message: '该项为必填项', trigger: 'blur' }, { validator: validatePass, trigger: 'blur' }]
+			},
+			// 添加的表单数据
+			addFormData: {
+				vcName: '',
+				vcCode: '',
+				vcTelephone: '',
+				vcAddress: '',
+				mapx: '',
+				mapy: '',
+				vcPictures: '',
+				companyId: ''
+			},
+			// 分页信息
+			total: 3,
+			page: 1,
+			pageSize: 20,
+			modalShow: false,
+			modalTitle: '新增'
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		// modalShow(val) {
+		// 	if (!val) {
+		// 		this.file = null
+		// 		this.isFile = false
+		// 		this.loadingStatus = false
+		// 		this.step = 0
+		// 	}
+		// }
+	},
+	created() {
+		this.getStationTree()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		// 接收地图传递过来的坐标
+		locations(location) {
+			if (this.upModalShow) {
+				this.upFormData.mapx = location.lng
+				this.upFormData.mapy = location.lat
+			} else if (this.modalAddShow) {
+				this.addFormData.mapx = location.lng
+				this.addFormData.mapy = location.lat
+			}
+		},
+
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		// 获取站点树
+		async getStationTree() {
+			let result = await this.axios.getUnitTree({ iFlag: 2 })
+			if (result.code == 200) {
+				let flgaNum = 1
+				this._forEach(result.data, true, item => {
+					item.expand = true
+					if (item.flag == flgaNum) {
+						// this.unitId = item.id
+						item.selected = true
+						flgaNum = 'a'
+					}
+				})
+				this.treeData = result.data
+				// console.log(this.treeData[0].children[0].children[0].children[0].children[1].id)
+				this.unitId = this.treeData[0].children[0].children[0].children[0].children[0].id
+				this.getTable()
+			}
+		},
+		// 站点树点击事件
+		handleStationTree(data) {
+			console.log(data[0])
+			if (data[0].flag == 0) {
+				// 如果不是变电站
+				this.unitId = ''
+				this.orgId = data[0].id
+				this.isTree = false // 新增不能点击
+			} else {
+				// 是变电站
+				this.unitId = data[0].id
+				this.orgId = ''
+				this.isTree = true
+			}
+
+			this.stationName = data[0].title
+			console.log(data)
+			this.getTable()
+		},
+		// 文件上传弹窗点击
+		handleUploadBtn() {
+			if (this.isTree) {
+				this.modalShow = true
+			} else {
+				this.$Message.warning('请选择左侧变电站')
+			}
+		},
+		// 选择文件
+		handleUpload(file) {
+			// 添加文件validateAge
+			this.file = file
+			this.step = 1
+			this.isFile = true
+			return false
+		},
+		// 移除文件
+		removeFile() {
+			this.file = null
+			this.step = 0
+			this.isFile = false
+		},
+		// 上传提交
+		upload() {
+			// 点击上传
+			if (this.isFile) {
+				if (this.file.name.substring(this.file.name.length - 3) == 'png' || this.file.name.substring(this.file.name.length - 3) == 'PNG') {
+					this.loadingStatus = true
+					this.step = 2
+					let params = new FormData() // 创建form对象
+					params.append('svgfile', this.file) // 通过append向form对象添加数据
+					params.append('unitID', this.unitId) // 添加变电站id
+					let config = {
+						header: { 'Content-Type': 'multipart/form-data' }
+					}
+					this.axios.uploadSvg(params, config).then(res => {
+						if (res.code == 200) {
+							this.file = null
+							this.loadingStatus = false
+							this.$Message.success({ duration: 3, content: '文件上传成功' })
+							this.modalShow = false
+							this.getTable()
+							this.step = 1
+						} else {
+							this.$Message.error(res.msg)
+						}
+					})
+				} else {
+					this.file = null
+					this.isFile = false
+					this.step = 0
+					this.$Message.warning('请选择.PNG格式的文件')
+				}
+			} else {
+				this.$Message.warning('请选择需要上传的文件')
+			}
+		},
+		// 弹窗取消
+		handleModalCancel() {
+			this.modalShow = false
+		},
+		// 获取表格数据列表
+		getTable() {
+			let params = {
+				unitId: this.unitId,
+				currentPage: this.page,
+				pageSize: this.pageSize
+			}
+			this.axios.getTableList(params).then(res => {
+				if (res.code == 200) {
+					// res.data.forEach(item => {
+					// 	item.isEnable1 = item.isEnable == '0' ? '禁用' : '启用'
+					// })
+					this.tableData = res.data.list
+					this.total = res.data.total
+					console.log(this.tableData)
+				}
+			})
+		},
+		// 删除
+		handleRemove(data, params) {
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除所选项?',
+				onOk: () => {
+					this.axios.delFireDate({ companyId: params.row.companyId }).then(res => {
+						if (res.code == 200) {
+							this.$Message.success('删除成功')
+							this.page = 1
+							this.getTable()
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+				},
+				onCancel: () => {}
+			})
+		},
+		//添加按钮
+		// handleModalShow() {
+		// 	if (this.isTree) {
+		// 		this.modalAddShow = true
+		// 	} else {
+		// 		this.$Message.warning('请选择左侧变电站')
+		// 	}
+		// },
+		// 添加/修改按钮
+		handleModalShow(data, params) {
+			data == 0 ? (this.modalTitle = '新增') : (this.modalTitle = '修改')
+			data == 0 ? (this.isAdd = true) : (this.isAdd = false)
+			if (data == 0) {
+				if (this.isTree) {
+					this.modalAddShow = true
+				} else {
+					this.$Message.warning('请选择左侧运维班')
+				}
+			} else {
+				this.addFormData.companyId = params.row.companyId
+				this.addFormData = JSON.parse(JSON.stringify(params.row))
+				this.modalAddShow = true
+			}
+		},
+		//确认添加/修改按钮
+		handleSaveStation(data) {
+			let params = {}
+			if (this.isAdd) {
+				// 新增
+				this.$refs.addFormRef.validate(async valid => {
+					if (!valid) return
+					//验证成功，掉接口提交数据
+					// let formData = new FormData()
+					// formData.append("unitId",this.unitId)
+					// formData.append("vcName",this.addFormData.vcName)
+					// formData.append("vcCode",this.addFormData.vcCode)
+					// formData.append("vcTelephone",this.addFormData.vcTelephone)
+					// formData.append("vcAddress",this.addFormData.vcAddress)
+					// formData.append("mapy",this.addFormData.mapy)
+					// formData.append("mapx",this.addFormData.mapx)
+					// formData.append("file",this.file)
+
+					params.unitId = this.unitId
+					params.vcName = this.addFormData.vcName
+					params.vcCode = this.addFormData.vcCode
+					params.vcTelephone = this.addFormData.vcTelephone
+					params.vcAddress = this.addFormData.vcAddress
+					params.mapy = this.addFormData.mapy
+					params.mapx = this.addFormData.mapx
+					params.vcPictures = this.addFormData.vcPictures
+					let res = await this.axios.addFireDate(params)
+					// let res = await this.axios.addFireDate(formData)
+					if (res.success) {
+						this.getTable()
+						this.modalAddShow = false
+					}
+				})
+			} else {
+				// 修改
+				this.$refs.addFormRef.validate(async valid => {
+					if (!valid) return
+					//验证成功，掉接口提交数据
+
+					// let formData = new FormData()
+					// formData.append("companyId",this.addFormData.companyId)
+					// formData.append("unitId",this.unitId)
+					// formData.append("vcName",this.addFormData.vcName)
+					// formData.append("vcCode",this.addFormData.vcCode)
+					// formData.append("vcTelephone",this.addFormData.vcTelephone)
+					// formData.append("vcAddress",this.addFormData.vcAddress)
+					// formData.append("mapy",this.addFormData.mapy)
+					// formData.append("mapx",this.addFormData.mapx)
+					// formData.append("file",this.file)
+
+					params.companyId = this.addFormData.companyId
+					params.unitId = this.unitId
+					params.vcName = this.addFormData.vcName
+					params.vcCode = this.addFormData.vcCode
+					params.vcTelephone = this.addFormData.vcTelephone
+					params.vcAddress = this.addFormData.vcAddress
+					params.mapy = this.addFormData.mapy
+					params.mapx = this.addFormData.mapx
+					params.vcPictures = this.addFormData.vcPictures
+					let res = await this.axios.addFireDate(params)
+					// let res = await this.axios.addFireDate(formData)
+					if (res.success) {
+						this.getTable()
+						this.modalAddShow = false
+					}
+				})
+			}
+		},
+		//取消按钮
+		handleModalCancel() {
+			this.$refs.addFormRef.resetFields()
+			this.addFormData.mapx = ''
+			this.addFormData.mapy = ''
+			this.modalAddShow = false
+		},
+		//关闭对话框
+		close() {
+			this.$refs.addFormRef.resetFields()
+			let that = this
+			if (!that.modalAddShow) {
+				that.addFormData.mapx = ''
+				that.addFormData.mapy = ''
+			}
+		},
+		// 地图弹窗
+		showMpa() {
+			this.showM = !this.showM
+		},
+		// 分页切换
+		handleChangePage(page) {
+			this.page = page
+			this.getTable()
+		},
+		// 分页条数
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getTable()
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.fire-part {
+  width: 100%;
+
+  // height: calc(100vh - 160px);
+  .left-tree {
+    width: 240px;
+    height: calc(100vh - 194px);
+    background-color: #fff;
+    border: 10px solid #fff;
+    overflow: auto;
+    float: left;
+  }
+
+  .right-content {
+    width: calc(100% - 250px);
+    height: 100%;
+    float: left;
+    margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+
+    .tool-bar {
+      .btn-box {
+        .ivu-btn {
+          margin-right: 10px;
+        }
+      }
+    }
+
+    .table-content {
+      width: 100%;
+
+      // flex: 1;
+      // position: relative;
+      /deep/ .ivu-table-wrapper {
+        height: calc(100vh - 268px) !important;
+
+        .ivu-table-body, .ivu-table-overflowY, .ivu-table-tip, .ivu-table-tip td {
+          height: calc(100vh - 270px) !important;
+        }
+      }
+
+      // /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+      // height: calc(100% - 40px) !important;
+      // }
+      /deep/.ivu-table {
+        p {
+          color: #19be6b;
+        }
+
+        b {
+          font-weight: 400;
+          color: #ff9900;
+        }
+
+        i {
+          font-style: normal;
+        }
+      }
+
+      /deep/tr.ivu-table-row-hover td {
+        background-color: #F5F7FA;
+      }
+
+      /deep/.ivu-btn {
+        font-size: 14px;
+      }
+
+      .table-page {
+        width: 100%;
+        position: absolute;
+        bottom: 20px;
+
+        .page-content {
+          width: 800px;
+          margin-left: 50%;
+          transform: translateX(-50%);
+        }
+      }
+    }
+  }
+}
+
+.upload-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+
+  .steps {
+    margin-left: 30px;
+    margin-bottom: 30px;
+  }
+
+  .up-box {
+    margin-left: 50px;
+    font-size: 16px;
+    color: #515a6e;
+    margin-top: 30px;
+
+    span {
+      font-size: 16px;
+      margin-top: 10px;
+      color: #464c5b;
+      font-weight: 700;
+      display: block;
+
+      .del {
+        float: left;
+        display: inline-block;
+        width: 30px;
+        text-align: center;
+        font-size: 18px;
+        line-height: 100%;
+        color: #2b85e4;
+        cursor: pointer;
+
+        &:hover {
+          color: #ed4014;
+        }
+      }
+    }
+  }
+
+  .btn1 {
+    width: 400px;
+    margin: 10px 10px 10px 50px;
+  }
+}
+
+.axis-form-item {
+  .icon-wrapper {
+    width: 80px;
+    height: 32px;
+    flex-align(center, center);
+    margin-left: 10px;
+
+    .ivu-icon {
+      font-size: 24px;
+      cursor: pointer;
+
+      &:hover {
+        color: #2d8cf0;
+      }
+    }
+  }
+
+  /deep/.ivu-form-item-content {
+    display: flex;
+
+    .ivu-input-wrapper {
+      &:first-of-type {
+        margin-right: 10px;
+      }
+    }
+  }
+}
+
+/deep/ .ivu-btn-error {
+  margin-left: 10px;
+}
+</style>

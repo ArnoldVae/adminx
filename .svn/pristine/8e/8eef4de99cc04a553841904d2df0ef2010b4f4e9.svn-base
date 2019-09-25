@@ -1,0 +1,53 @@
+import axios from '@/config/api.request'
+
+export default {
+	// 获取站点树
+	getUnitTree(params) {
+		return axios.request({
+			url: 'org/find_tree',
+			method: 'post',
+			data: params
+		})
+	},
+	//防区table列表
+	gettableList(params) {
+		return axios.request({
+			url: 'protectarea/firePrtctAreaRpInfoList',
+			method: 'post',
+			data: params
+		})
+    },
+    //防区列表
+    getareaList(params){
+        return axios.request({
+			url: 'protectarea/list',
+			method: 'post',
+			data: params
+		})
+    },
+    //应急预案
+    getContingency(params){
+        return axios.request({
+			url: 'fireRpInfo/fireRpInfoSimpleList',
+			method: 'post',
+			data: params
+		})
+    },
+    //防区信息保存
+    getprareinfoSave(params){
+        return axios.request({
+			url: 'protectarea/saveOrUpdate',
+			method: 'post',
+			data: params
+		})
+	},
+	//防护区信息删除
+	deleData(params){
+		return axios.request({
+			url: 'protectarea/delPrtctarea',
+			method: 'post',
+			data: params
+		})
+	}
+
+}

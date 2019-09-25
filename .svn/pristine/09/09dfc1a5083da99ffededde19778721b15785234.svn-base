@@ -1,0 +1,851 @@
+<template>
+	<div class="scene-config">
+		<div class="org-tree-wrapper">
+			<div>
+				<search-tree
+					ref="search-tree"
+					:data="sceneTreeData"
+					placeholder="输入关键词搜索..."
+					@on-select-change="handleSceneTreeSelect"
+					@on-toggle-expand="handleToggleExpand"
+				>
+					<Icon type="ios-search" slot="suffix" />
+				</search-tree>
+			</div>
+		</div>
+
+		<!-- 表格主体 -->
+		<div class="scene-table-main" ref="scene-table-main">
+			<!-- 头 -->
+			<searche-header-wrapper ref="searche-header-wrapper">
+				<!-- 场景名称 -->
+				<form-item title="场景名称" type="text" v-model="params.vcName" placeholder="输入场景名称搜索" :clearable="true"></form-item>
+				<!-- 场景类型 -->
+				<form-item
+					title="场景类型"
+					type="select"
+					:options="[{ id: 'all', value: '全部' }, ...sceneType]"
+					v-model="params.type"
+					:setings="{ value: 'id', label: 'value' }"
+					placeholder
+					:clearable="true"
+				></form-item>
+				<!-- 场景编号 -->
+				<form-item title="场景编号" type="text" v-model="params.vcCode" placeholder="输入场景编号搜索" :clearable="true"></form-item>
+
+				<com-button type="search" style="margin-right: 40px;" @click="tableLoad"></com-button>
+
+				<div style="width: 100%;">
+					<com-button size="large" type="add" :disabled="!canAddSceneOrg" @click="handleBtn('add-sce-org')">添加场景组织</com-button>
+
+					<com-button size="large" type="edit" :disabled="!canActionSceOrg" @click="handleBtn('edit-sce-org')">修改场景组织</com-button>
+
+					<com-button size="large" type="delete" style="margin-right: 60px;" :disabled="!canActionSceOrg" @click="handleBtn('delete-sce-org')"
+						>删除场景组织</com-button
+					>
+
+					<com-button size="large" type="add" :disabled="!canActionScene" @click="handleBtn('add-scene')">添加场景</com-button>
+					<com-button size="large" type="delete" :disabled="!canActionScene && !selectionsIds.length > 0" @click="handleBtn('batch-delete-scene')"
+						>批量删除</com-button
+					>
+				</div>
+			</searche-header-wrapper>
+
+			<!-- 表格 -->
+			<div class="table-main">
+				<element-table
+					:columns="columns"
+					:data="tableData"
+					border
+					:show-selection="true"
+					:height="contentHeight"
+					@on-edit="handleEditScene"
+					@on-delete="handleDeleteScene"
+					@selection-change="handleSelectionChange"
+				></element-table>
+
+				<!-- 分页 -->
+				<Page
+					style="margin-top: 10px;"
+					:total="pageConfig.total"
+					:current="pageConfig.page"
+					:page-size="pageConfig.pageSize"
+					show-sizer
+					show-elevator
+					show-total
+					@on-change="PageChangeHandler('page', $event)"
+					@on-page-size-change="PageChangeHandler('pageSize', $event)"
+				/>
+			</div>
+		</div>
+
+		<!-- 模态框 -->
+		<Modal
+			v-model="sceneModal.show"
+			:title="sceneModal.title"
+			:mask-closable="false"
+			:width="sceneModal.type == 'add-scene' || sceneModal.type == 'edit-scene' ? 90 : 600"
+		>
+			<!-- 添加 or 修改场景组织 表单 -->
+			<div v-show="sceneModal.type == 'add-sce-org' || sceneModal.type == 'edit-sce-org'">
+				<com-form ref="sce-org-form" v-model="sceOrgForm" :items="sceOrgFormItems"></com-form>
+			</div>
+
+			<!-- 添加 or 修改场景 -->
+			<div v-show="sceneModal.type == 'add-scene' || sceneModal.type == 'edit-scene'">
+				<add-or-edit-scene
+					:type="sceneModal.type"
+					:show="sceneModal.show && (sceneModal.type == 'add-scene' || sceneModal.type == 'edit-scene')"
+					:station="sceneModal.type != 'edit-scene' ? currentStation : editConfig.station"
+					:sceOrg="sceneModal.type != 'edit-scene' ? currentSceOrg : editConfig.org"
+					:scene="sceneModal.type != 'edit-scene' ? currentScene : editConfig.scene"
+					:editScene="sceneModal.type != 'edit-scene' ? currentScene : editConfig.editScene"
+					:isSubmit="isSubmit"
+					:sceneType="sceneType"
+					@on-success="handleSceneOnsuccess"
+				></add-or-edit-scene>
+			</div>
+
+			<!-- footer -->
+			<modal-footer slot="footer" @on-cancel="sceneModal.set(false)" @on-confirm="handleModalConfirm(sceneModal.type)"></modal-footer>
+		</Modal>
+	</div>
+</template>
+<script>
+import { ModalConfig, PageConfig } from '@/libs/construction'
+import elementTable from '_b/element-table'
+import mixinTolls from '@common/mixin/tools'
+
+import addOrEditScene from './add-edit-scene'
+
+export default {
+	name: 'scene-config',
+	mixins: [mixinTolls],
+	components: {
+		elementTable,
+		addOrEditScene
+	},
+	props: {},
+	data() {
+		return {
+			http: this.$api.sceneConfig,
+			getComHeightMain: null,
+
+			// 树
+			sceneTreeData: [],
+			expandNodeList: [],
+			notExpandNodeList: [],
+			// 搜索
+			params: {
+				vcName: '',
+				type: 'all',
+				vcCode: ''
+			},
+
+			pageConfig: new PageConfig(), // 分页
+			sceneModal: new ModalConfig(), // 弹框
+
+			// 场景组织 添加 or 修改 表单
+			sceOrgForm: {
+				parentSceneOrgId: '',
+				sceneOrgId: '',
+				unitId: '',
+				vcName: '',
+				iSort: 0,
+				iFlag: ''
+			},
+			sceOrgFormItems: [
+				{
+					label: '名称',
+					prop: 'vcName',
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }, { pattern: /^.{0,63}$/, message: '最多输入64字', trigger: 'change' }]
+				},
+				{
+					label: '排序',
+					prop: 'iSort',
+					rules: [{ pattern: /^[0-9]\d{0,4}$/, message: '请正确输入数字排序', trigger: 'change' }]
+				},
+				{
+					label: '标识',
+					prop: 'iFlag',
+					rules: [{ pattern: /^[0-9]\d{0,4}$/, message: '请正确输入数字标识', trigger: 'change' }]
+				}
+			],
+
+			// 表格
+			columns: [
+				{ label: '名称', prop: 'vcName', width: 200 },
+				{ label: '站端', prop: 'stationName', width: 200 },
+				{ label: '场景类型', prop: 'typeHtml', width: 200 },
+				{ label: '场景编号', prop: 'vcCode', width: 120 },
+				// { label: '标识', prop: 'flag', width: 120 },
+				{ label: '备注', prop: 'memo' },
+				{ label: '操作', prop: 'action', width: 240, editShow: true, deleteShow: true }
+			],
+			tableData: [],
+			selectionsIds: [],
+
+			// 场景
+			isSubmit: false,
+			sceneType: [],
+
+			// 处于激活状态的数据
+			currentStation: null, // 站
+			currentSceOrg: null, // 场景组织
+			currentScene: null, // 场景
+			previousNodeId: '', // 之前 || 当前处于 激活的 node id
+			prevHaveDataTreeNode: null,
+
+			// 编辑场景必要的数据
+			editConfig: {
+				station: null,
+				org: null,
+				scene: null,
+				editScene: null
+			}
+		}
+	},
+	computed: {
+		canAddSceneOrg() {
+			// if ((this.currentStation || this.currentSceOrg) && !this.currentScene) {
+			// 	return true
+			// } else return false
+			if (this.currentStation && !this.currentScene && !this.currentSceOrg) {
+				return true
+			} else return false
+		},
+		canActionSceOrg() {
+			if (this.currentStation && this.currentSceOrg && !this.currentScene) return true
+			else return false
+		},
+		canActionScene() {
+			if (this.currentSceOrg || this.currentScene) return true
+			else return false
+		}
+		// Listener() {
+		// 	if (this.currentStation || this.currentSceOrg) {
+		// 		this.tableLoad()
+		// 	}
+
+		// 	return 1
+		// }
+	},
+	filters: {},
+	watch: {
+		'sceneModal.show'(val) {
+			if (!val) {
+				if (this.sceneModal.type == 'add-sce-org' || this.sceneModal.type == 'edit-sce-org') {
+					this.resetComForm(this.sceOrgForm, {}, 'sce-org-form')
+				}
+			}
+		}
+		// Listener(val) {}
+	},
+	created() {
+		this.init()
+	},
+	mounted() {
+		//  监听窗口变化
+		this.getComHeightMain = this.getComHeight('scene-table-main', 'searche-header-wrapper')
+		this.$nextTick(() => {
+			this.getComHeightMain()
+		})
+		window.addEventListener('resize', this.getComHeightMain)
+	},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		init() {
+			// 获取字典数据
+			let params = {
+				dictGroupID: 1008
+			}
+			this.$api.orgManage.getOrgDict(params).then(res => {
+				if (res.code == 200) {
+					console.log(res)
+					this.sceneType = res.data.map(item => {
+						return {
+							id: String(item.dictID),
+							value: item.vcName
+						}
+					})
+					console.log(this.sceneType)
+					this.treeLoad() // 获取场景树
+				}
+			})
+			this.tableLoad()
+		},
+		// 组织树加载
+		treeLoad() {
+			let params = {
+				flag: 3
+			}
+			this.http.getSceneTree(params).then(res => {
+				if (res.code == 200) {
+					this.sceneTreeData = this.mapSourceToData(res.data)
+
+					this.getSelectedNode(this.sceneTreeData)
+
+					// 获取树中的第一个变电站
+					this.getFirstStation(this.sceneTreeData)
+				}
+			})
+		},
+		// 场景表格加载
+		tableLoad() {
+			let unitId = this.currentStation ? this.currentStation.id : ''
+			let sceneOrgId = this.currentSceOrg ? this.currentSceOrg.id : ''
+			let { vcName, type, vcCode } = this.params
+
+			let params = {
+				vcName,
+				type: type == 'all' ? '' : type,
+				vcCode,
+				unitId,
+				sceneOrgId,
+				currentPage: this.pageConfig.page,
+				pageSize: this.pageConfig.pageSize
+			}
+
+			this.http.getSceneData(params).then(res => {
+				if (res.code == 200) {
+					console.log(res)
+					this.tableData = res.data.lists.map(item => {
+						let index = this.sceneType.findIndex(v => {
+							return v.id == item['type']
+						})
+						item['typeHtml'] = this.sceneType[index] ? this.sceneType[index].value : ''
+
+						return item
+					})
+					this.pageConfig.total = res.data.page.totalNum
+				}
+			})
+		},
+
+		// 树节点选中
+		handleSceneTreeSelect(data) {
+			if (!this.prevHaveDataTreeNode) {
+				this.prevHaveDataTreeNode = this.getNodeById(this.sceneTreeData, this.currentStation.id)
+			}
+
+			if (!data.length) {
+				this.$refs['search-tree'].$refs.tree.handleSelect(this.prevHaveDataTreeNode.nodeKey)
+				return
+			} else {
+				this.prevHaveDataTreeNode = data[0]
+				this.previousNodeId = data[0].id
+			}
+
+			//  1 org  | 2 station | 3 node | 4 scene
+
+			let node = data[0]
+
+			switch (node.flagName) {
+				case 'org':
+					// 激活node
+					this.currentStation = null
+					this.currentSceOrg = null
+					this.currentScene = null
+
+					// other
+					this.tableData = []
+					this.tableLoad()
+					break
+				case 'station':
+					// 激活node
+					this.currentStation = node
+					this.currentSceOrg = null
+					this.currentScene = null
+					this.tableLoad()
+					break
+				case 'node':
+					// 激活node
+					this.currentStation = null
+					this.currentSceOrg = node
+					this.currentScene = null
+
+					// other
+					this.currentStation = this.getCurrentStationByOrgId(node.pid)
+					this.tableLoad()
+					break
+				case 'scene': {
+					// 激活node
+					this.currentStation = null
+					this.currentSceOrg = null
+					this.currentScene = node
+
+					// other
+					let { station, sceneOrg } = this.getCurrentStationAndOrgByScenePid(node.pid)
+					this.currentStation = station
+					this.currentSceOrg = sceneOrg
+					this.tableLoad()
+					break
+				}
+			}
+		},
+		// 树节点 切换展开状态
+		handleToggleExpand(data) {
+			let { expandArr, notExpandArr } = this.getExpandSceOrgNode()
+			this.expandNodeList = expandArr
+			this.notExpandNodeList = notExpandArr
+		},
+
+		// 按钮点击
+		handleBtn(type) {
+			let sceOrg = this.transforDataToObject(this.currentSceOrg)
+
+			switch (type) {
+				case 'add-sce-org':
+					this.sceneModal.set(true, type, '添加场景组织')
+					break
+				case 'edit-sce-org': {
+					let sceneOrgId = this.currentSceOrg.id
+					this.http.getSceneOrgInfo(sceneOrgId).then(res => {
+						if (res.code == 200) {
+							this.setFormBySource(this.sceOrgForm, res.data[0])
+							this.sceneModal.set(true, type, '修改场景组织')
+						} else this.$Message.warning(`错误：${res.msg}`)
+					})
+					break
+				}
+				case 'delete-sce-org':
+					this.$Modal.confirm({
+						title: '确认删除',
+						content: '<p>是否确认删除场景组织</p>',
+						onOk: () => {
+							this.http
+								.deleteSceneOrg(this.currentSceOrg.id)
+								.then(res => {
+									if (res.code == 200) {
+										this.$Message.success('删除成功')
+										this.treeLoad()
+									} else this.$Message.warning(`${res.msg}`)
+								})
+								.catch(error => {
+									console.log(error)
+								})
+						}
+					})
+					break
+				case 'add-scene':
+					this.sceneModal.set(true, type, '添加场景')
+					break
+				case 'batch-delete-scene':
+					this.handleDeleteScene(null, null, this.selectionsIds.join(','))
+					break
+			}
+		},
+
+		// 模态框确定
+		handleModalConfirm(type) {
+			if (type == 'add-sce-org' || type == 'edit-sce-org') {
+				this.validateComForm('sce-org-form', () => {
+					let request = ''
+					let text = ''
+					let params = this.disposeAddSceOrgParams()
+
+					type == 'add-sce-org' ? ((request = 'addSceneOrg'), (text = '添加')) : ((request = 'editSceneOrg'), (text = '修改'))
+
+					// console.log(`${text}场景组织：request == '${request}' == params == `, params, 'localForm: ', this.sceOrgForm)
+
+					this.http[request](params).then(res => {
+						if (res.code == 200) {
+							this.$Message.success(`${text}场景组织成功`)
+							this.treeLoad()
+							this.sceneModal.set(false)
+						} else this.$Message.warning(`错误：${res.msg}`)
+					})
+				})
+			} else if (type == 'add-scene' || type == 'edit-scene') {
+				this.isSubmit = !this.isSubmit
+			}
+		},
+		disposeAddSceOrgParams() {
+			let parentSceneOrgId = this.currentSceOrg ? this.currentSceOrg.id : '0'
+			let { vcName, iSort, iFlag, sceneOrgId } = this.sceOrgForm
+
+			return {
+				parentSceneOrgId,
+				unitId: this.currentStation.id,
+				vcName,
+				iSort: Number(iSort),
+				iFlag: Number(iFlag),
+				sceneOrgId
+			}
+		},
+
+		// 编辑场景
+		handleEditScene(data, index) {
+			let scene = this.getTreeSceneNode(data.sceneId)
+			let { station, sceneOrg } = this.getCurrentStationAndOrgByScenePid(scene.pid)
+
+			this.$set(this.editConfig, 'station', station)
+			this.$set(this.editConfig, 'org', sceneOrg)
+			this.$set(this.editConfig, 'scene', scene)
+			this.$set(this.editConfig, 'editScene', data)
+
+			this.sceneModal.set(true, 'edit-scene', '编辑场景')
+		},
+
+		// 删除场景
+		handleDeleteScene(data, index, selectionIds) {
+			if (!data && !selectionIds) {
+				this.$Message.warning('未选择场景')
+				return
+			}
+
+			this.$Modal.confirm({
+				title: '确认',
+				content: '<p>是否确认删除所选场景</p>',
+				onOk: () => {
+					let params = selectionIds || data.sceneId
+
+					this.http.deleteSceneInfo(params).then(res => {
+						if (res.code == 200) {
+							this.$Message.success('删除成功')
+							this.treeLoad()
+							this.tableLoad()
+						} else this.$Message.warning(`错误：${res.msg}`)
+					})
+				}
+			})
+		},
+
+		// 多选场景
+		handleSelectionChange(datas) {
+			this.selectionsIds = datas.map(item => {
+				return item.sceneId
+			})
+		},
+
+		// 编辑 or 新增场景 请求成功
+		handleSceneOnsuccess() {
+			this.sceneModal.set(false)
+
+			this.treeLoad()
+			this.tableLoad()
+		},
+
+		// components tools =========================================
+		// 获取 node 根据传入的 节点 id
+		getNodeById(source, id) {
+			let node = ''
+			function temp(source) {
+				source.forEach(item => {
+					if (item.id == id) {
+						node = item
+					} else {
+						temp(item.children, id)
+					}
+				})
+			}
+
+			temp(source, id)
+
+			return node
+		},
+
+		// 获取树里面的第一个变电站
+		getFirstStation(data) {
+			let arr = []
+			function temp(source) {
+				for (let i = 0; i < source.length; i++) {
+					if (source[i].flagName == 'station') {
+						arr.push(source[i])
+					}
+					if (source[i].children.length > 0) {
+						temp(source[i].children)
+					}
+				}
+			}
+
+			temp(data)
+
+			// debugger
+
+			if (!this.previousNodeId && arr.length) {
+				this.currentStation = arr[0]
+				this.$set(arr[0], 'selected', true)
+			}
+
+			return arr
+		},
+		// 获取活动的 station
+		getCurrentStationByOrgId(pid) {
+			let station = null
+			let rootSource = this.transforDataToObject(this.sceneTreeData)
+			function temp(source, pid) {
+				source.forEach(item => {
+					if (item.id == pid) {
+						if (item.flagName == 'station') {
+							station = item
+						} else {
+							temp(rootSource, item.pid)
+						}
+					} else {
+						temp(item.children, pid)
+					}
+				})
+			}
+
+			temp(rootSource, pid)
+			return station
+		},
+
+		// 获取活动的 org && station by scene pId
+		getCurrentStationAndOrgByScenePid(pid) {
+			let sceneOrg = null
+			let station = null
+			let rootSource = this.transforDataToObject(this.sceneTreeData)
+
+			function temp(source, pid) {
+				source.forEach(item => {
+					if (item.id == pid && item.flagName == 'node') {
+						sceneOrg = item
+					} else {
+						temp(item.children, pid)
+					}
+				})
+			}
+
+			temp(rootSource, pid)
+
+			station = this.getCurrentStationByOrgId(sceneOrg.pid)
+
+			return {
+				station,
+				sceneOrg
+			}
+		},
+
+		// 根据 场景 id 获取对应的 树节点
+		getTreeSceneNode(sceneId) {
+			let scene = null
+			let rootSource = this.transforDataToObject(this.sceneTreeData)
+
+			function temp(source, sceneId) {
+				source.forEach(item => {
+					if (item.id == sceneId) {
+						scene = item
+					} else {
+						temp(item.children, sceneId)
+					}
+				})
+			}
+			temp(rootSource, sceneId)
+			return scene
+		},
+		// 递归查询数据是否含有选中状态的节点 如果没有 就清除当前组件活动的 item
+		getSelectedNode(source) {
+			let target = null
+			function temp(source) {
+				source.forEach(item => {
+					if (item.selected) {
+						target = item
+					} else {
+						temp(item.children)
+					}
+				})
+			}
+
+			temp(source)
+
+			if (!target) {
+				this.currentStation = null
+				this.currentSceOrg = null
+				this.currentScene = null
+			}
+
+			return target
+		},
+		// 获取所有展开的 组织节点
+		getExpandSceOrgNode() {
+			let expandArr = []
+			let notExpandArr = []
+			let rootSource = this.transforDataToObject(this.sceneTreeData)
+
+			function temp(source) {
+				source.forEach(item => {
+					if (item.expand) {
+						expandArr.push(item)
+					} else {
+						notExpandArr.push(item)
+					}
+
+					temp(item.children)
+				})
+			}
+			temp(rootSource)
+
+			return {
+				expandArr,
+				notExpandArr
+			}
+		},
+
+		// 源数据映射为需要的数据
+		mapSourceToData(source) {
+			return source.map(item => {
+				if ((item.flagName == 'node' && item.children.findIndex(v => v.flagName == 'node') == -1) || item.flagName == 'scene') {
+					item['expand'] = false
+				} else item['expand'] = true
+
+				if (this.expandNodeList.length || this.notExpandNodeList.length) {
+					this.expandNodeList.forEach(v => {
+						if (v.id == item.id) item['expand'] = true
+					})
+					this.notExpandNodeList.forEach(v => {
+						if (v.id == item.id) item['expand'] = false
+					})
+				}
+
+				item['title'] = item.text
+
+				if (item.flagName == 'node') item['render'] = this.renderSceOrgIcon
+				if (item.flagName == 'scene') item['render'] = this.renderScene
+
+				if (this.previousNodeId && item.id == this.previousNodeId) item['selected'] = true // 设置选中
+
+				if (item.children.length == 0) {
+					return item
+				} else {
+					item['children'] = this.mapSourceToData(item.children)
+					return item
+				}
+			})
+		},
+		// render tree org node
+		renderSceOrgIcon(h, { data, root, node }) {
+			return h('span', [
+				h('Icon', {
+					props: {
+						type: 'ios-folder-open-outline'
+					}
+				}),
+				h(
+					'span',
+					{
+						class: [
+							'ivu-tree-title',
+							{
+								'ivu-tree-title-selected': data.selected
+							}
+						],
+						style: {
+							cursor: 'pointer',
+							display: 'inline-block',
+							marginLeft: '5px'
+						},
+						on: {
+							click: () => {
+								this.$refs['search-tree'].$refs.tree.handleSelect(data.nodeKey)
+							}
+						}
+					},
+					data.title
+				)
+			])
+		},
+		// render tree scene node
+		renderScene(h, { data, root, node }) {
+			return h('span', [
+				h('Icon', {
+					props: {
+						type: 'ios-pricetags-outline'
+					}
+				}),
+				h(
+					'span',
+					{
+						class: [
+							'ivu-tree-title',
+							{
+								'ivu-tree-title-selected': data.selected
+							}
+						],
+						style: {
+							cursor: 'pointer',
+							display: 'inline-block',
+							marginLeft: '5px'
+						},
+						on: {
+							click: () => {
+								this.$refs['search-tree'].$refs.tree.handleSelect(data.nodeKey)
+							}
+						}
+					},
+					data.title
+				)
+			])
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		window.removeEventListener('resize', this.getComHeightMain)
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.scene-config {
+  width: 100%;
+  height: 100%;
+  flex-align();
+
+  .org-tree-wrapper {
+    create-wrap(300px, 100%, true, true);
+	height:calc(100vh - 200px);
+    margin-right: 10px;
+    background-color: #fff;
+    padding: 8px;
+    position: relative;
+
+    > div {
+      overflow-y: auto;
+      width: 100%;
+      height: 100%;
+      padding-top: 35px;
+    }
+
+    /deep/.ivu-input-wrapper {
+      width: 284px;
+      z-index: 99;
+      top: 8px;
+      left: 50%;
+      position: absolute;
+      transform: translateX(-50%);
+    }
+  }
+
+  .scene-table-main {
+    width: calc(100% - 310px);
+    height: 100%;
+
+    .table-main {
+      .ivu-page {
+        flex-align(center);
+      }
+    }
+  }
+}
+.table-main{
+	height calc(100vh - 280px)
+	.element-table{
+		// height:100%;
+		.el-table{
+			// height:100%;
+		}
+	}
+}
+// .org-tree-wrapper{
+// 		height calc(100vh - 225px)!important;
+// }
+</style>
+<style lang="stylus"></style>

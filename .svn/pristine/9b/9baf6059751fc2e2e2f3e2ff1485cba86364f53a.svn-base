@@ -1,0 +1,1762 @@
+<template>
+	<div class="device-modeling-content">
+		<!-- 右边 -->
+		<div class="container" :class="{ stretch: activeParentIsCollapsed }">
+			<h2>{{ activeOrgTreeOrgTitle }} - {{ activeTypeTiele }}</h2>
+			<div class="operation">
+				<searche-header-wrapper class="wrap1">
+					<Button :disabled="activeOrgTreeNodeType != 1" size="large" type="success" icon="md-add" class="add" @click="handleAddACDeviceModal"
+						>新增设备</Button
+					>
+					<Button
+						:disabled="activeOrgTreeNodeType != 1"
+						size="large"
+						type="success"
+						icon="ios-videocam-outline"
+						class="add"
+						@click="handleAutoCreateVideoDevice"
+						>自动生成视频设备</Button
+					>
+					<Button
+						:disabled="activeOrgTreeNodeType != 1"
+						size="large"
+						type="success"
+						icon="ios-sunny-outline"
+						class="add"
+						@click="handleAutoCreateLightsDevice"
+						>自动生成灯光设备</Button
+					>
+					<Button :disabled="activeOrgTreeNodeType != 1" size="large" type="success" icon="md-redo" class="add" @click="handleAutoCreateDevice"
+						>按规则生成设备</Button
+					>
+					<Button size="large" v-if="false" type="success" icon="md-add" class="add" @click="handleAddASDevice">新增巡检</Button>
+					<Button size="large" type="info" icon="md-arrow-round-down" :disabled="activeOrgTreeNodeType != 1" @click="devExport">导出设备</Button>
+					<Button size="large" type="primary" icon="md-arrow-round-up" :disabled="activeOrgTreeNodeType != 1" @click="handleUpload">导入设备</Button>
+				</searche-header-wrapper>
+				<searche-header-wrapper>
+					<form-item type="text" title="设备名称" v-model="searchInfo.devicename" placeholder="输入设备名称搜索" clearable></form-item>
+					<Button size="large" type="info" icon="md-search" class="search" @click="handleQueryList">查询</Button>
+					<Button size="large" type="primary" icon="md-refresh" class="reset" @click="handleResetList">重置</Button>
+					<Button size="large" type="error" class="delete" @click="handleDeleteDevices">批量删除</Button>
+					<div v-if="false">
+						<Button type="primary" v-if="!tableAllExpanded" icon="md-expand" class="node" @click="handleShowAllNodes">显示全部节点</Button>
+						<Button type="primary" v-else icon="md-contract" class="node" @click="handleHideAllNodes">隐藏全部节点</Button>
+					</div>
+				</searche-header-wrapper>
+			</div>
+			<Table
+				v-if="deviceTable"
+				:loading="tableLoading"
+				@on-selection-change="handleSelectChange"
+				@on-row-dblclick="handleDbclickRowEdit"
+				:row-class-name="rowClassName"
+				border
+				height="580"
+				highlight-row
+				:columns="columns"
+				:data="tableData"
+			>
+				<template slot-scope="{ row, index }" slot="action">
+					<Button size="large" type="warning" icon="ios-create-outline" @click="handleDeviceEdit(row, index)">编辑</Button>
+					<Button size="large" :style="{ marginLeft: `${5 / 22.5}rem` }" type="error" icon="md-trash" class="delete" @click="handleDeleteDevice(row)"
+						>删除</Button
+					>
+				</template>
+				<template slot="status">
+					<div class="wrap">
+						<Icon type="md-checkmark" />
+						<Icon type="md-close" />
+						<Icon type="md-done-all" />
+						<Icon type="ios-notifications-off" />
+					</div>
+				</template>
+			</Table>
+			<Page
+				@on-change="handleChangePage"
+				@on-page-size-change="handleChangeSize"
+				:total="total"
+				:current="page"
+				:page-size="pageSize"
+				show-sizer
+				show-elevator
+				show-total
+			/>
+		</div>
+		<!-- 左边 -->
+		<div class="tree">
+			<Tabs>
+				<TabPane label="组织" icon="md-globe">
+					<org-tree
+						@sendActiveNodeTitle="updateOrgTreeActiveNodeTitle"
+						@sendActiveNodeType="updateOrgTreeActiveNodeType"
+						@sendActiveNodeId="updateOrgTreeActiveNodeId"
+						@sendActiveOrgId="updateOrgTreeActiveOrgId"
+						@sendActiveStationId="updateOrgTreeActiveStationId"
+						@hook:mounted="orgTreeIsStart = true"
+					></org-tree>
+				</TabPane>
+				<TabPane label="子系统" icon="md-construct">
+					<SearchTree @on-select-change="handleSelectNodes" ref="typeTree" clearable :data="treeData" placeholder="请输入关键词搜索...">
+						<Icon type="ios-search" slot="suffix" />
+					</SearchTree>
+				</TabPane>
+			</Tabs>
+		</div>
+		<!-- 编辑界面 fullscreen-->
+		<Modal :closable="false" class="editAndAddModal" v-model="editAndAddModal" footer-hide :mask-closable="false" :mask="false" :transfer="false">
+			<div slot="header"></div>
+			<div>
+				<Icon @click="handleCancel" type="md-close" class="close" />
+				<editAndAdd @handleBack="handleCancel"></editAndAdd>
+			</div>
+			<div slot="footer"></div>
+		</Modal>
+
+		<!-- 规则批量提取界面 draggable-->
+		<Modal class="batchExtractModal1" fullscreen v-model="batchExtractModal" title="按规则生成设备">
+			<div class="extract-wrap">
+				<div class="node-info">
+					<div class="left">
+						<Tabs :animated="false" :value="activePane" @on-click="handleClickTabs">
+							<TabPane label="子系统模型">
+								<SearchTree
+									:style="{ width: `${220 / 22.5}rem`, overflowY: 'auto' }"
+									@on-select-change="handleSelectTypeNodes"
+									clearable
+									:data="typeTreeData"
+									placeholder="请输入关键词搜索..."
+								>
+									<Icon type="ios-search" slot="suffix" />
+								</SearchTree>
+							</TabPane>
+							<TabPane label="SMType类型">
+								<SearchTree
+									:style="{ width: `${220 / 22.5}rem`, overflowY: 'auto' }"
+									@on-select-change="handleSelectSmNodes"
+									clearable
+									:data="smTreeData"
+									placeholder="请输入关键词搜索..."
+								>
+									<Icon type="ios-search" slot="suffix" />
+								</SearchTree>
+							</TabPane>
+						</Tabs>
+					</div>
+					<div class="right">
+						<Table ref="addTable" :loading="addLoading" border height="550" highlight-row :columns="columns2" :data="tableData2">
+							<template slot-scope="{ row, index }" slot="nodeName">
+								<span>{{ `${row.smName} ${row.nodeName}` }}</span>
+							</template>
+						</Table>
+						<!-- <Page
+							@on-change="handleChangeModalPage"
+							@on-page-size-change="handleChangeModalSize"
+							:total="total2_ex"
+							:current="page2_ex"
+							:page-size="pageSize2_ex"
+							show-sizer
+							show-elevator
+							show-total
+						/>-->
+					</div>
+				</div>
+				<div class="action-info">
+					<Form :rules="batchExtractInfoRule" ref="batchExtractInfo" :model="batchExtractInfo" :label-width="100" inline>
+						<FormItem label="跳过测点数量" prop="skip">
+							<InputNumber
+								:style="{ width: `${150 / 22.5}rem` }"
+								:precision="0"
+								:max="10000"
+								:min="0"
+								v-model="batchExtractInfo.skip"
+								placeholder="输入跳过节点数量"
+							></InputNumber>
+						</FormItem>
+						<FormItem label="每组测点数量" prop="group">
+							<InputNumber
+								:style="{ width: `${150 / 22.5}rem` }"
+								:precision="0"
+								:max="10000"
+								:min="1"
+								v-model="batchExtractInfo.group"
+								placeholder="输入每组节点数量"
+							></InputNumber>
+						</FormItem>
+						<FormItem>
+							<Button type="info" icon="md-search" class="search" @click="getCurrentGroupTableData">确定规则生成模板</Button>
+						</FormItem>
+
+						<br />
+						<FormItem label="设备名称" prop="name">
+							<Input type="text" v-model="batchExtractInfo.name" placeholder="输入设备名称" clearable></Input>
+						</FormItem>
+						<FormItem label="所属模板类型" prop="type">
+							<Select filterable @on-change="handleChangeDeviveTypeExt" v-model="batchExtractInfo.type" placeholder="选择设备类型">
+								<Option v-for="item in deviceTypeList" :value="item.devTypeId + ''" :key="item.devTypeId">{{ item.vcName }}</Option>
+							</Select>
+						</FormItem>
+					</Form>
+					<Table
+						v-if="batchExtractTable"
+						:loading="batchExtractLoading"
+						border
+						height="500"
+						highlight-row
+						:columns="columns3"
+						:data="currentGroupTableData"
+					>
+						<template slot-scope="{ row, index }" slot="smName">
+							<div :style="{ padding: `${10 / 22.5}rem 0px` }">
+								<Input
+									@on-change="handleEditValueSmName(index, $event)"
+									:autosize="{ minRows: 1, maxRows: 4 }"
+									type="textarea"
+									v-model="row.smName"
+								/>
+							</div>
+						</template>
+
+						<template slot-scope="{ row, index }" slot="functionId">
+							<Select
+								label-in-value
+								@on-change="handleEditFunctionIdExt(index, $event)"
+								v-model="row.functionId"
+								placeholder="选择功能"
+								clearable
+							>
+								<Option v-for="item in FunctionIdListExt" :value="item.functionId" :key="item.functionId" :label="item.vcName" />
+							</Select>
+						</template>
+
+						<template slot-scope="{ row, index }" slot="nodeType">
+							<Select
+								label-in-value
+								@on-change="handleEditNodeTypeExt(index, $event)"
+								v-model="row.nodeType"
+								placeholder="选择节点类型"
+								clearable
+							>
+								<Option v-for="item in nodeTypeList" :value="item.id" :key="item.id" :label="item.value" />
+							</Select>
+						</template>
+
+						<template slot-scope="{ row, index }" slot="vcValueDesc">
+							<Input @on-change="handleEditValueDescExt(index, $event)" type="text" v-model="row.vcDesc" />
+						</template>
+
+						<template slot-scope="{ row, index }" slot="valueUnit">
+							<Input @on-change="handleEditValueUnitExt(index, $event)" type="text" v-model="row.vcUnit" />
+						</template>
+
+						<template slot-scope="{ row, index }" slot="nodeName">
+							<span>{{ row.nodeName }}</span>
+						</template>
+					</Table>
+				</div>
+			</div>
+			<div slot="footer">
+				<Button :loading="saveNextLoading" icon="md-sync" type="primary" size="large" @click="batchExtractSaveNext">提取并查看下一组</Button>
+				<!-- <Button icon="md-folder" type="primary" size="large" @click="autoExtract">按规则自动提取</Button> -->
+			</div>
+		</Modal>
+		<uploadModal v-model="uploadShow" :unitid="activeOrgTreeStationId" @subShow="subShow" @uploadSuccess="uploadSuccess"></uploadModal>
+	</div>
+</template>
+<script>
+import orgTree from './org-tree'
+import editAndAdd from './add-ac-and-edit'
+import { findComponentUpward, findComponentDownward, dataDeepCopy } from '@/libs/assist'
+import uploadModal from './upload-modal'
+import qs from 'qs'
+export default {
+	name: 'device-modeling-content',
+	components: { orgTree, editAndAdd, uploadModal },
+	props: {},
+	data() {
+		return {
+			// 指定'SideMenu'组件
+			$_sideMenu: findComponentUpward(this, 'Main'),
+			// 指定'add-ac-and-edit'组件
+			$_addAcAndEdit: findComponentDownward(this, 'add-ac-and-edit'),
+			// 监听子组件是否准备完毕，然后触发父组件计算属性
+			orgTreeIsStart: false,
+			// 指定'device-modeling'组件
+			$_orgTree: findComponentDownward(this, 'org-tree'),
+			// 类型树数据源
+			treeData: [],
+			// 当前节点类型
+			nodeType: null,
+			// 当前节点id
+			activeNodeId: '',
+			// 当前子系统id
+			activeSubsystemId: '',
+			// 当前设备类型id
+			activeDeviceTypeId: '',
+			// 当前节点title
+			activeTypeTiele: '',
+			// 搜索表单数据模型
+			searchInfo: {
+				devicename: ''
+			},
+			// Table相关
+			columns: [
+				{
+					type: 'selection',
+					width: 60,
+					align: 'center'
+				},
+				{
+					title: '序号',
+					type: 'index',
+					width: 80,
+					align: 'center'
+				},
+				{
+					title: '站所名称',
+					key: 'unitName',
+					align: 'left'
+				},
+				{
+					title: '设备名称',
+					key: 'vcName',
+					align: 'left'
+				},
+				{
+					title: '操作',
+					slot: 'action',
+					align: 'center',
+					width: 220
+				}
+			],
+			tableData: [],
+			tableLoading: false,
+			total: 0,
+			page: 1,
+			pageSize: 20,
+			// 是否全部展开
+			tableAllExpanded: false,
+			// 左侧树宽度
+			leftLayoutWidth: 220,
+			// 子组件org-tree的必要参数值
+			activeOrgTreeOrgTitle: '',
+			activeOrgTreeOrgId: '',
+			activeOrgTreeStationId: '',
+			activeOrgTreeNodeId: '',
+			activeOrgTreeNodeType: '',
+			// 当前所选row
+			selectionRow: [],
+			// 编辑智辅与新增相关
+			editAndAddModal: false,
+			// 当前操作
+			action: '',
+			deviceTable: true,
+			// 提取界面
+			batchExtractModal: false,
+			batchExtractInfoRule: {
+				group: [{ type: 'number', required: true, message: '请输入每组节点数量', trigger: 'blur' }],
+				name: [{ required: true, message: '请输入设备名称', trigger: 'blur' }],
+				type: [{ required: true, message: '请选择设备类型', trigger: 'change' }]
+			},
+			batchExtractTable: true,
+			batchExtractInfo: {
+				skip: 0,
+				group: 1,
+				name: '',
+				type: ''
+			},
+			batchExtractLoading: false,
+			columns3: [
+				{
+					title: '节点名称',
+					slot: 'smName',
+					align: 'center',
+					minWidth: 100
+				},
+				{
+					title: '功能',
+					slot: 'functionId',
+					align: 'center',
+					minWidth: 60
+				},
+				{
+					title: '节点类型',
+					slot: 'nodeType',
+					align: 'center'
+				},
+				{
+					title: '值描述',
+					slot: 'vcValueDesc',
+					align: 'center',
+					minWidth: 100
+				},
+				{
+					title: '值/单位',
+					slot: 'valueUnit',
+					align: 'center'
+				},
+				{
+					title: '绑定测点',
+					slot: 'nodeName',
+					align: 'center',
+					minWidth: 100
+					// width: 300
+				}
+			],
+			currentGroupTableData: [],
+			vcENodeNameEditExt: '',
+			nodeTypeList: [],
+			// 提取界面左侧数据区域
+			activePane: 0,
+			typeTreeData: [],
+			nodeType_t: '',
+			activeNodeId_t: '',
+			activeSubsystemId_t: '',
+			activeTypeTiele_t: '',
+			activeDeviceTypeId_t: '',
+			page2_ex: 1,
+			pageSize2_ex: 9999,
+			addLoading: false,
+			smNodeType: '',
+			activeSmNodeId: '',
+			activeSmSubsystemId: '',
+			activeSmTypeTiele: '',
+			activeSmTypeId: '',
+			isQueryAll: 1,
+			smTreeData: [],
+			total2_ex: 0,
+			columns2: [
+				{
+					type: 'index',
+					maxWidth: 60,
+					align: 'center'
+				},
+				{
+					title: 'SMType',
+					key: 'smTypeName',
+					align: 'center'
+				},
+				{
+					title: '测点信息',
+					// key: 'nodeName',
+					slot: 'nodeName',
+					align: 'center',
+					minWidth: 200
+				},
+				{
+					title: '测点类型',
+					key: 'iNodeTypeName',
+					align: 'center'
+				}
+			],
+			tableData2: [],
+			tableDataBackup: [],
+			tableData3: [],
+			deviceTypeList: [],
+			editIndexExt: -1,
+			FunctionIdListExt: [],
+			nodeTypeListExt: [],
+			extractedArr: [],
+			saveNextLoading: false,
+			source: 'data',
+			uploadShow: false
+		}
+	},
+	computed: {
+		activeParentIsCollapsed: function() {
+			return this.$data.$_sideMenu.collapsed
+		}
+	},
+	filters: {},
+	watch: {
+		activeOrgTreeNodeId: {
+			handler() {
+				if (this.orgTreeIsStart) {
+					this.getAllDeviceList()
+				}
+			},
+			immediate: true
+		},
+		activeNodeId: {
+			handler() {
+				if (this.orgTreeIsStart) {
+					this.getAllDeviceList()
+				}
+			},
+			immediate: true
+		},
+		editAndAddModal: {
+			handler(val) {
+				if (!val) {
+					if (this.action == 'add') {
+						this.page = 1
+						this.getAllDeviceList()
+					} else {
+						this.getAllDeviceList()
+					}
+				}
+			}
+			// immediate: true
+		},
+		batchExtractModal: {
+			handler(val) {
+				if (val == false) {
+					// console.log('关闭了')
+					this.nodeType_t = ''
+					this.activeNodeId_t = ''
+					this.activeSubsystemId_t = ''
+					this.activeTypeTiele_t = ''
+					this.activeDeviceTypeId_t = ''
+					this.smNodeType = ''
+					this.activeSmNodeId = ''
+					this.activeSmSubsystemId = ''
+					this.activeSmTypeTiele = ''
+					this.activeSmTypeId = ''
+					this.activePane = 0
+
+					this.batchExtractInfo.skip = 0
+					this.batchExtractInfo.group = 1
+					this.batchExtractInfo.name = ''
+					this.batchExtractInfo.type = ''
+
+					this.getAllDeviceList()
+				}
+			}
+		}
+	},
+	created() {
+		this.init()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		// 更新 org-tree组件 title
+		updateOrgTreeActiveNodeTitle(value) {
+			this.activeOrgTreeOrgTitle = value
+		},
+		// 更新 org-tree组件 节点类型
+		updateOrgTreeActiveNodeType(value) {
+			this.activeOrgTreeNodeType = value
+		},
+		// 更新 org-tree组件 节点id
+		updateOrgTreeActiveNodeId(value) {
+			this.activeOrgTreeNodeId = value
+		},
+		// 更新 org-tree组件 组织 id
+		updateOrgTreeActiveOrgId(value) {
+			this.activeOrgTreeOrgId = value
+		},
+		// 更新 org-tree组件 站所 id
+		updateOrgTreeActiveStationId(value) {
+			this.activeOrgTreeStationId = value
+		},
+		// 获取设备类型树信息
+		async getDeviceTypeTreeInfo() {
+			let result = await this.$api.deviceModeling.getDeviceTypeTreeInfo({
+				treeType: 2,
+				subSystemId: 0,
+				type: 0
+			})
+			if (result.success) {
+				// 获取数据
+				let tempData = {
+					title: '全部子系统',
+					flag: -1,
+					id: '',
+					expand: true,
+					children: []
+				}
+
+				result.data.map(item => {
+					tempData.children.push(item)
+				})
+
+				this.treeData.push(tempData)
+
+				// 处理默认参数
+				if (this.treeData[0].children[0]) {
+					// 默认选中第一个父节点
+					this.treeData[0]['selected'] = true
+					// 默认展开第一层子系统前三个节点数据
+					this.treeData[0].children.forEach((item, index) => {
+						if (index < 1) item.expand = true
+					})
+					// 默认的下级请求参数 nodeType 0:子系统 1:设备类型
+					this.nodeType = this.treeData[0]['flag']
+					// 更新 当前节点id
+					this.activeNodeId = this.treeData[0]['id']
+					// 默认的下级请求参数 子系统id
+					this.activeSubsystemId = this.treeData[0]['id']
+					// 默认的当前节点title
+					this.activeTypeTiele = this.treeData[0]['title']
+				} else {
+					this.nodeType = null
+					this.activeSubsystemId = ''
+					this.activeTypeTiele = ''
+				}
+			}
+		},
+		// 获取所有设备列表
+		async getAllDeviceList() {
+			try {
+				this.tableLoading = true
+				let OrgId = ''
+				let StationId = ''
+				if (this.activeOrgTreeNodeType == 0) {
+					OrgId = this.activeOrgTreeOrgId
+					StationId = ''
+				} else if (this.activeOrgTreeNodeType == 1) {
+					OrgId = ''
+					StationId = this.activeOrgTreeStationId
+				}
+				let SubsystemId = ''
+				let DeviceTypeId = ''
+				if (this.nodeType == 0) {
+					SubsystemId = this.activeSubsystemId
+					DeviceTypeId = ''
+				} else if (this.nodeType == 1) {
+					SubsystemId = ''
+					DeviceTypeId = this.activeDeviceTypeId
+				}
+				let result = await this.$api.deviceModeling.getAllDeviceList({
+					orgId: OrgId,
+					unitId: StationId,
+					subSystemId: SubsystemId,
+					devTypeId: DeviceTypeId,
+					vcName: this.searchInfo.devicename,
+					currentPage: this.page,
+					pageSize: this.pageSize
+				})
+				if (result.success) {
+					this.tableData = result.data.lists
+					this.total = result.data.page.totalNum
+					this.tableLoading = false
+				} else {
+					this.total = 0
+					this.tableLoading = false
+				}
+			} catch (e) {
+				this.tableData = []
+				this.total = 0
+				this.tableLoading = false
+				this.$Message.error(`${e}`)
+			}
+		},
+		// Row class
+		rowClassName(row, index) {
+			if (index % 2 == 0) {
+				return 'table-row1'
+			} else {
+				return 'table-row2'
+			}
+		},
+		// 双击行编辑
+		handleDbclickRowEdit(row, index) {
+			this.handleDeviceEdit(row, index)
+		},
+		init() {
+			this.getDeviceTypeTreeInfo()
+			this.getNodeTypeList()
+			this.getDeviceTypeList()
+		},
+		// 选择节点
+		handleSelectNodes(node) {
+			if (JSON.stringify(node) == '[]') return
+			// 更新 当前节点类型
+			this.nodeType = node[0]['flag']
+			// 更新 当前节点id
+			this.activeNodeId = node[0]['id']
+			if (node[0].flag == 0) {
+				this.activeSubsystemId = node[0]['id']
+			} else {
+				this.activeDeviceTypeId = node[0]['id'].split('_')[1]
+			}
+			// 更新 当前节点title
+			this.activeTypeTiele = node[0]['title']
+		},
+		// 搜索查询
+		handleQueryList() {
+			this.page = 1
+			this.getAllDeviceList()
+		},
+		// 重置搜索信息并查询
+		handleResetList() {
+			Object.keys(this.searchInfo).forEach(item => {
+				this.searchInfo[item] = ''
+			})
+			this.page = 1
+			this.pageSize = 20
+			this.getAllDeviceList()
+		},
+		// 当前选择节点
+		handleSelectChange(selection) {
+			this.selectionRow = selection
+		},
+		// 分页跳转
+		handleChangePage(page) {
+			this.page = page
+			this.getAllDeviceList()
+		},
+		// 改变分页大小
+		handleChangeSize(size) {
+			this.pageSize = size
+			this.getAllDeviceList()
+		},
+		// 展开全部子节点
+		handleShowAllNodes() {
+			this.tableData.forEach((item, index) => {
+				this.$set(this.tableData[index], '_expanded', true)
+			})
+			this.tableAllExpanded = true
+		},
+		// 隐藏全部子节点
+		handleHideAllNodes() {
+			this.tableData.forEach((item, index) => {
+				this.$set(this.tableData[index], '_expanded', false)
+			})
+			this.tableAllExpanded = false
+		},
+		// 设备编辑
+		handleDeviceEdit(row, index) {
+			this.action = 'edit'
+			let data = {
+				parentStationId: this.activeOrgTreeStationId,
+				parentNodeId: this.activeOrgTreeNodeId
+			}
+			let vm = findComponentDownward(this, 'add-ac-and-edit')
+			// 操作标识
+			vm.activeAction = 'edit'
+			vm.nextTo = true
+			// 更新请求参数
+			vm.parentParams = data
+			// 默认表单数据
+			vm.basicInfoXHR = row
+			// vm.getBasicInfoWeb()
+			vm.getDeviceNodesInfo(row.devId, row.devTypeId)
+
+			// 更新下一页所需参数
+			vm.parentTableData = this.tableData
+			vm.parentIndex = index
+			this.editAndAddModal = true
+		},
+		// 删除设备 HTTP
+		async deleteDevice(id) {
+			let result = await this.$api.deviceModeling.deleteDevice([id])
+			return result
+		},
+		// 删除设备
+		async handleDeleteDevice(row) {
+			this.$Modal.confirm({
+				title: '警告',
+				content: '确认删除吗？',
+				onOk: () => {
+					this.deleteDevice(row.devId).then(result => {
+						if (result.success) {
+							this.$Message.success('删除成功')
+							this.getAllDeviceList()
+						} else {
+							this.$Message.error('删除失败')
+						}
+					})
+				}
+			})
+		},
+		// 批量删除设备 HTTP
+		async deleteDevices() {
+			let deleteArr = []
+			this.selectionRow.map(item => {
+				deleteArr.push(item.devId)
+			})
+			let result = await this.$api.deviceModeling.deleteDevice(deleteArr)
+			return result
+		},
+		// 批量删除
+		async handleDeleteDevices() {
+			if (this.selectionRow.length == 0) {
+				return this.$Message.warning('请选中要删除的设备')
+			}
+			this.$Modal.confirm({
+				title: '警告',
+				content: '确认删除吗？',
+				onOk: () => {
+					this.deleteDevices().then(result => {
+						if (result.success) {
+							this.$Message.success('删除成功')
+							this.getAllDeviceList()
+						} else {
+							this.$Message.error('删除失败')
+						}
+					})
+				}
+			})
+		},
+		// 新增智辅模态框
+		handleAddACDeviceModal() {
+			this.action = 'add'
+
+			let vm = findComponentDownward(this, 'add-ac-and-edit')
+			// 操作标识
+			vm.activeAction = 'add-ac'
+			vm.nextTo = false
+			// 更新请求参数
+			vm.parentParams = {
+				parentStationId: this.activeOrgTreeStationId,
+				parentNodeId: this.activeOrgTreeNodeId
+			}
+
+			// 清空表单数据
+			Object.keys(vm.basicInfo).forEach(item => {
+				vm.$set(vm.basicInfo, item, '')
+			})
+			vm.$refs.basicInfo.resetFields()
+			// 清空表格数据
+			vm.tableData = []
+			this.editAndAddModal = true
+		},
+		// 自动生成视频设备
+		async handleAutoCreateVideoDevice() {
+			try {
+				let result = await this.$api.deviceModeling.autoCreateVideoDevice({
+					unitId: this.activeOrgTreeStationId
+				})
+				if (result.success) {
+					this.$Message.success('自动创建视频设备成功')
+					// 更新当前设备列表
+					this.getAllDeviceList()
+				} else {
+					this.$Message.error(result.msg)
+				}
+			} catch (e) {
+				this.$Message.error(`${e}`)
+			}
+		},
+		// 自动生成灯光设备
+		async handleAutoCreateLightsDevice() {
+			try {
+				let result = await this.$api.deviceModeling.autoCreateLightsDevice({
+					unitId: this.activeOrgTreeStationId
+				})
+				if (result.success) {
+					this.$Message.success('自动创建灯光设备成功')
+					// 更新当前设备列表
+					this.getAllDeviceList()
+				} else {
+					this.$Message.error(result.msg)
+				}
+			} catch (e) {
+				this.$Message.error(`${e}`)
+			}
+		},
+		// 按规则生成设备弹窗
+		async handleAutoCreateDevice() {
+			this.tableData2 = []
+			this.batchExtractModal = true
+			this.batchExtractLoading = true
+
+			await this.getDeviceTypeTreeInfo_ex()
+			await this.getSmTypeTreeInfo()
+			await this.getNotConfiguredList()
+			// 获取备份数据
+			dataDeepCopy(this.tableDataBackup, this.tableData3, false)
+
+			// 初始默认值
+			this.batchExtractInfo.skip = 0
+			this.batchExtractInfo.group = 1
+			await this.getCurrentGroupTableData()
+			this.batchExtractLoading = false
+		},
+		// 新增巡检
+		handleAddASDevice() {},
+		handleCancel() {
+			if (!findComponentDownward(this, 'add-ac-and-edit').currentNodeListIsNewest()) {
+				this.$Modal.confirm({
+					title: '警告',
+					content: '当前有未保存节点数据，是否返回设备页？',
+					onOk: () => {
+						this.editAndAddModal = false
+						findComponentDownward(this, 'add-ac-and-edit').editIndex = -1
+					}
+				})
+			} else {
+				this.editAndAddModal = false
+				findComponentDownward(this, 'add-ac-and-edit').editIndex = -1
+			}
+		},
+		// 生成当前组数据
+		async getCurrentGroupTableData(extracted) {
+			if (extracted && extracted.length > 0) {
+				extracted.map(ext => {
+					this.tableData3 = this.tableData3.filter(item => {
+						if (ext.nodeGuId == item.nodeGUID) {
+							return false
+						} else {
+							return true
+						}
+					})
+				})
+			}
+
+			// 按照模板匹配当前节点
+			let startIndex = this.batchExtractInfo.skip - 1
+			let entIndex = this.batchExtractInfo.group + this.batchExtractInfo.skip
+			this.currentGroupTableData = this.tableData3.filter((item, index) => {
+				if (index > startIndex && index < entIndex) return true
+			})
+
+			// 提取结束
+			if (this.currentGroupTableData.length == 0) {
+				return
+				// (this.batchExtractInfo.name = '当前已提取完成')
+			}
+
+			// 更新当前节点名称
+			if (this.currentGroupTableData[0] && this.currentGroupTableData[0]['nodeName']) {
+				this.batchExtractInfo.name = this.currentGroupTableData[0]['nodeName']
+			}
+			console.log('当前的数据源', this.source)
+			if (this.extractTemplate && this.extractTemplate.length > 0 && this.source == 'Template') {
+				console.log('利用模板更新')
+				this.extractTemplate.map((temp, index) => {
+					this.$set(this.currentGroupTableData[index], 'smName', temp.smName)
+					this.$set(this.currentGroupTableData[index], 'functionId', temp.functionId)
+					this.$set(this.currentGroupTableData[index], 'functionName', temp.functionName)
+					this.$set(this.currentGroupTableData[index], 'nodeType', temp.nodeType + '')
+					this.$set(this.currentGroupTableData[index], 'iNodeTypeName', temp.iNodeTypeName)
+					this.$set(this.currentGroupTableData[index], 'vcUnit', temp.vcUnit)
+					this.$set(this.currentGroupTableData[index], 'vcDesc', temp.vcDesc)
+				})
+			} else if (this.source == 'Function') {
+				console.log('利用功能列表更新')
+				// 初次赋值 按照功能，赋值模板
+				if (this.FunctionIdListExt && this.FunctionIdListExt.length > 0) {
+					this.FunctionIdListExt.map((item, index) => {
+						if (this.currentGroupTableData[index]) {
+							this.$set(this.currentGroupTableData[index], 'functionId', item.functionId)
+							this.$set(this.currentGroupTableData[index], 'nodeType', item.nodeType + '')
+							this.$set(this.currentGroupTableData[index], 'smName', item.vcName)
+							this.$set(this.currentGroupTableData[index], 'vcUnit', item.vcUnit)
+							this.$set(this.currentGroupTableData[index], 'vcDesc', item.vcDesc)
+						}
+					})
+				}
+			} else if (this.source == 'data') {
+				console.log('利用原数据更新')
+			}
+			console.log('模板', this.extractTemplate)
+			console.log('数据', this.currentGroupTableData)
+		},
+		// 选择设备类型
+		async handleChangeDeviveTypeExt(value) {
+			await this.getNodeFunListExt(value)
+			this.source = 'Function'
+			this.getCurrentGroupTableData()
+		},
+		// 编辑按规则提取节点功能
+		handleEditFunctionIdExt(index, iview) {
+			if (iview) {
+				this.currentGroupTableData[index].functionId = iview.value
+				this.currentGroupTableData[index].functionName = iview.label
+				// 更新 类型 描述 单位
+
+				console.log(this.FunctionIdListExt)
+				this.FunctionIdListExt.map(item => {
+					if (iview.value == item.functionId) {
+						this.currentGroupTableData[index].nodeType = item.nodeType + ''
+						this.currentGroupTableData[index].vcDesc = item.vcDesc
+						this.currentGroupTableData[index].vcUnit = item.vcUnit
+						this.currentGroupTableData[index].smName = item.vcName
+						this.vcUnitEditExt = item.vcUnit
+					}
+				})
+				this.nodeTypeListExt.map(item => {
+					this.currentGroupTableData[index].nodeType == item.id && (this.currentGroupTableData[index].iNodeTypeName = item.value)
+				})
+
+				/* if (!this.currentGroupTableData[index].nodeType) {
+					this.FunctionIdListExt.map(item => {
+						if (iview.value == item.functionId) {
+							this.currentGroupTableData[index].nodeType = item.nodeType
+						}
+					})
+					this.nodeTypeListExt.map(item => {
+						this.currentGroupTableData[index].nodeType == item.id && (this.currentGroupTableData[index].iNodeTypeName = item.value)
+					})
+				} */
+				/* if (!this.currentGroupTableData[index].vcDesc) {
+					this.FunctionIdListExt.map(item => {
+						if (iview.value == item.functionId) {
+							this.currentGroupTableData[index].vcDesc = item.vcDesc
+						}
+					})
+				} */
+				/* if (!this.currentGroupTableData[index].vcUnit) {
+					this.FunctionIdListExt.map(item => {
+						if (iview.value == item.functionId) {
+							this.currentGroupTableData[index].vcUnit = item.vcUnit
+							this.vcUnitEditExt = item.vcUnit
+						}
+					})
+				} */
+			} else {
+				this.currentGroupTableData[index].functionId = 0
+				this.currentGroupTableData[index].functionName = ''
+			}
+		},
+		// 获取提取节点功能字典码
+		async getNodeFunListExt(type) {
+			let result = await this.$api.deviceModeling.getNodeFunList({
+				devTypeId: type,
+				currentPage: 1,
+				pageSize: 200
+			})
+			if (result.success) {
+				this.FunctionIdListExt = result.data.lists
+			}
+		},
+		// 编辑按规则提取节点类型
+		handleEditNodeTypeExt(index, iview) {
+			if (iview) {
+				this.currentGroupTableData[index].nodeType = iview.value
+				this.currentGroupTableData[index].iNodeTypeName = iview.label
+			} else {
+				this.currentGroupTableData[index].nodeType = ''
+				this.currentGroupTableData[index].iNodeTypeName = ''
+			}
+		},
+		// 获取节点类型枚举
+		async getNodeTypeList() {
+			let { data } = await this.$api.getLocalData()
+			this.nodeTypeList = data.nodeTypeList
+		},
+		// 编辑按规则提取值描述
+		handleEditValueDescExt(index, { target }) {
+			this.$set(this.currentGroupTableData[index], 'vcDesc', target.value)
+		},
+		// 编辑按规则提取单位
+		handleEditValueUnitExt(index, { target }) {
+			this.$set(this.currentGroupTableData[index], 'vcUnit', target.value)
+		},
+		// 编辑节点名称
+		handleEditValueSmName(index, { target }) {
+			this.$set(this.currentGroupTableData[index], 'smName', target.value)
+		},
+		// 单组提取设备 HTTP
+		async batchExtractionDevices() {
+			this.extractedArr = []
+			this.extractTemplate.map(item => {
+				this.extractedArr.push({
+					nodeGuId: item.nodeGUID,
+					functionId: item.functionId,
+					vcName: item.smName,
+					iNodeType: item.nodeType,
+					vcUnit: item.vcUnit,
+					vcValueDesc: item.vcDesc
+				})
+			})
+
+			// let paramsArr = []
+			// paramsArr.push({
+			// 	vcName: this.batchExtractInfo.name,
+			// 	unitId: this.activeOrgTreeStationId,
+			// 	devTypeId: this.batchExtractInfo.type,
+			// 	// levelType: 10040002,
+			// 	devNodesList: this.extractedArr
+			// })
+
+			// console.log(JSON.stringify(paramsArr))
+
+			let result = await this.$api.deviceModeling.autoCreateDevice({
+				vcName: this.batchExtractInfo.name,
+				unitId: this.activeOrgTreeStationId,
+				devTypeId: this.batchExtractInfo.type,
+				devNodesList: this.extractedArr
+			})
+			return result
+		},
+		// 保存并查看下一组 ##
+		async batchExtractSaveNext() {
+			if (this.currentGroupTableData.length == 0) {
+				return this.$Message.warning('当前规则,暂无设备可提取')
+			}
+
+			this.source = 'Template'
+
+			this.saveNextLoading = true
+			this.extractTemplate = []
+			dataDeepCopy(this.currentGroupTableData, this.extractTemplate, false)
+
+			let _this = this
+			this.$refs['batchExtractInfo'].validate(valid => {
+				if (valid) {
+					_this.batchExtractionDevices().then(result => {
+						if (result.success) {
+							_this.$Message.success('提取一组设备成功!')
+							// 更新表格列表
+							_this.getNotConfiguredData()
+							// 更新展示节点列表
+							_this.getCurrentGroupTableData(this.extractedArr)
+
+							// _this.getDeviceNodesInfo(_this.basicInfoXHR.devId)
+							_this.saveNextLoading = false
+							// _this.resetData()
+						} else {
+							_this.$Message.error('提取一组设备失败!')
+							_this.saveNextLoading = false
+						}
+					})
+				} else {
+					_this.saveNextLoading = false
+					return _this.$Message.error('请输入必填项并重新提交！')
+				}
+			})
+		},
+		// 重置
+		async resetData() {
+			// // 更新列表数据
+			this.batchExtractLoading = true
+			await this.getNotConfiguredList()
+			// 获取备份数据
+			dataDeepCopy(this.tableDataBackup, this.tableData3, false)
+			await this.getCurrentGroupTableData()
+			this.batchExtractLoading = false
+		},
+		// tabs点击事件
+		async handleClickTabs(name) {
+			this.activePane = name
+
+			// 更新列表
+			this.page2_ex = 1
+			// this.pageSize2_ex = 20
+			// this.getNotConfiguredList()
+
+			// 更新列表数据
+			this.batchExtractLoading = true
+			await this.getNotConfiguredList()
+			// 获取备份数据
+			dataDeepCopy(this.tableDataBackup, this.tableData3, false)
+			await this.getCurrentGroupTableData()
+			this.batchExtractLoading = false
+		},
+		// 获取设备类型树信息
+		async getDeviceTypeTreeInfo_ex() {
+			this.typeTreeData = []
+			let result = await this.$api.deviceModeling.getDeviceTypeTreeInfo({
+				treeType: 2,
+				subSystemId: 0,
+				type: 0
+			})
+			if (result.success) {
+				let tempData = {
+					title: '全部子系统',
+					flag: -1,
+					id: '',
+					expand: true,
+					children: []
+				}
+
+				result.data.map(item => {
+					tempData.children.push(item)
+				})
+
+				this.typeTreeData.push(tempData)
+
+				// 处理默认参数
+				if (this.typeTreeData[0].children[0]) {
+					// 默认选中第一个父节点
+					this.typeTreeData[0]['selected'] = true
+					// 默认展开第一层子系统前三个节点数据
+					this.typeTreeData[0].children.forEach((item, index) => {
+						if (index < 1) item.expand = true
+					})
+					// 默认的请求参数 nodeType 0:子系统 1:设备类型
+					this.nodeType_t = this.typeTreeData[0]['flag']
+					// 更新 当前节点id
+					this.activeNodeId_t = this.typeTreeData[0]['id']
+					// 默认的请求参数 子系统id
+					this.activeSubsystemId_t = this.typeTreeData[0]['id']
+					// 默认的当前节点title
+					this.activeTypeTiele_t = this.typeTreeData[0]['title']
+				} else {
+					this.nodeType_t = null
+					this.activeSubsystemId_t = ''
+					this.activeTypeTiele_t = ''
+				}
+			}
+		},
+		// 选择设备类型节点
+		async handleSelectTypeNodes(node) {
+			if (JSON.stringify(node) == '[]') return
+
+			// 更新 当前节点类型
+			this.nodeType_t = node[0]['flag']
+			// 更新 当前节点id
+			this.activeNodeId_t = node[0]['id']
+
+			console.log(node[0].flag)
+			if (node[0].flag == 0) {
+				this.activeSubsystemId_t = node[0]['id']
+				this.activeNodeId_t = node[0]['id']
+
+				this.source = 'data'
+				// this.batchExtractInfo.type = ''
+			} else {
+				this.activeDeviceTypeId_t = node[0]['id'].split('_')[1]
+				this.activeNodeId_t = node[0]['id'].split('_')[1]
+				// 更新默认类型
+				this.batchExtractInfo.type = node[0]['id'].split('_')[1]
+				// 获取节点功能
+				this.getNodeFunListExt(this.batchExtractInfo.type)
+
+				this.source = 'Function'
+			}
+
+			// 更新 当前节点title
+			this.activeTypeTiele_t = node[0]['title']
+			this.page2_ex = 1
+			// this.pageSize2_ex = 20
+			// this.getNotConfiguredList()
+
+			// 更新列表数据
+			this.batchExtractLoading = true
+			await this.getNotConfiguredList()
+			// 获取备份数据
+			dataDeepCopy(this.tableDataBackup, this.tableData3, false)
+			await this.getCurrentGroupTableData()
+			this.batchExtractLoading = false
+		},
+		// 获取设sm类型树信息
+		async getSmTypeTreeInfo() {
+			this.smTreeData = []
+			let result = await this.$api.deviceModeling.getSmTypeTreeInfo({
+				subSystemId: 0,
+				type: 0
+			})
+			if (result.success) {
+				let tempData = {
+					title: '全部子系统',
+					flag: -1,
+					id: '',
+					expand: true,
+					children: []
+				}
+
+				result.data.map(item => {
+					tempData.children.push(item)
+				})
+
+				this.smTreeData.push(tempData)
+
+				// 处理默认参数
+				if (this.smTreeData[0].children[0]) {
+					// 默认选中第一个父节点
+					this.smTreeData[0]['selected'] = true
+					// 默认展开第一层子系统前三个节点数据
+					this.smTreeData[0].children.forEach((item, index) => {
+						if (index < 1) item.expand = true
+					})
+					// 默认的请求参数 nodeType 0:子系统 1:设备类型
+					this.smNodeType = this.smTreeData[0]['flag']
+					// 更新 当前节点id
+					this.activeSmNodeId = this.smTreeData[0]['id']
+					// 默认的请求参数 子系统id
+					this.activeSmSubsystemId = this.smTreeData[0]['id']
+					// 默认的当前节点title
+					this.activeSmTypeTiele = this.smTreeData[0]['title']
+				} else {
+					this.smNodeType = null
+					this.activeSmSubsystemId = ''
+					this.activeSmTypeTiele = ''
+				}
+			}
+		},
+		// 选择sm类型节点
+		async handleSelectSmNodes(node) {
+			if (JSON.stringify(node) == '[]') return
+			// 更新 当前节点类型
+			this.smNodeType = node[0]['flag']
+			// 更新 当前节点id
+			this.activeSmNodeId = node[0]['id']
+
+			if (node[0]['flag'] == 0) {
+				this.activeSmSubsystemId = node[0]['id']
+				this.activeSmNodeId = node[0]['id']
+
+				this.source = 'data'
+				// this.batchExtractInfo.type = ''
+			} else {
+				this.activeSmTypeId = node[0]['id'].split('_')[1]
+				this.activeSmNodeId = node[0]['id'].split('_')[1]
+				// 更新默认类型
+				this.batchExtractInfo.type = node[0]['id'].split('_')[1]
+				// 获取节点功能
+				this.getNodeFunListExt(this.batchExtractInfo.type)
+
+				this.source = 'Function'
+			}
+			// 更新 当前节点title
+			this.activeSmTypeTiele = node[0]['title']
+			this.page2_ex = 1
+			// this.pageSize2_ex = 20
+			// this.getNotConfiguredList()
+
+			// // 更新列表数据
+			this.batchExtractLoading = true
+			await this.getNotConfiguredList()
+			// 获取备份数据
+			dataDeepCopy(this.tableDataBackup, this.tableData3, false)
+			await this.getCurrentGroupTableData()
+			this.batchExtractLoading = false
+		},
+		// 查询未配置智辅节点列表 #2
+		async getNotConfiguredList() {
+			this.addLoading = true
+
+			// this.batchExtractInfo.skip = 0
+			// this.batchExtractInfo.group = 1
+			// this.batchExtractInfo.name = ''
+			// this.batchExtractInfo.type = ''
+
+			this.tableData2 = []
+			this.tableDataBackup = []
+			this.tableData3 = []
+			this.currentGroupTableData = []
+
+			let scopeParams = {}
+
+			if (this.activePane == 0) {
+				// 判断当前选中的是子系统还是设备类型
+				if (this.nodeType_t == 0) {
+					scopeParams.subSystemId = this.activeSubsystemId_t
+				} else {
+					scopeParams.devType = this.activeDeviceTypeId_t
+				}
+			}
+			if (this.activePane == 1) {
+				// 判断当前选中的是子系统还是设备类型
+				if (this.smNodeType == 0) {
+					scopeParams.subSystemId = this.activeSmSubsystemId
+				} else {
+					scopeParams.smTypeID = this.activeSmTypeId
+				}
+			}
+
+			let result = await this.$api.deviceModeling.getNotConfiguredList({
+				flag: this.isQueryAll,
+				unitId: this.activeOrgTreeStationId,
+				currentPage: this.page2_ex,
+				pageSize: this.pageSize2_ex,
+				nodeName: '',
+				...scopeParams
+			})
+			if (result.success) {
+				this.tableData2 = result.data.lists
+				// 处理节点类型描述
+				this.tableData2.forEach(item => {
+					this.nodeTypeList.map(sub => {
+						item.nodeType == sub.id && (item.iNodeTypeName = sub.value)
+						item.nodeType = item.nodeType + ''
+					})
+				})
+				this.total2_ex = result.data.page.totalNum
+
+				// 拷贝数据到规则提取
+				dataDeepCopy(this.tableData2, this.tableDataBackup, false)
+
+				this.addLoading = false
+			} else {
+				this.tableData2 = []
+				this.total2_ex = 0
+				this.addLoading = false
+			}
+		},
+		async getNotConfiguredData() {
+			this.addLoading = true
+
+			let scopeParams = {}
+
+			if (this.activePane == 0) {
+				// 判断当前选中的是子系统还是设备类型
+				if (this.nodeType_t == 0) {
+					scopeParams.subSystemId = this.activeSubsystemId_t
+				} else {
+					scopeParams.devType = this.activeDeviceTypeId_t
+				}
+			}
+			if (this.activePane == 1) {
+				// 判断当前选中的是子系统还是设备类型
+				if (this.smNodeType == 0) {
+					scopeParams.subSystemId = this.activeSmSubsystemId
+				} else {
+					scopeParams.smTypeID = this.activeSmTypeId
+				}
+			}
+
+			let result = await this.$api.deviceModeling.getNotConfiguredList({
+				flag: this.isQueryAll,
+				unitId: this.activeOrgTreeStationId,
+				currentPage: this.page2_ex,
+				pageSize: this.pageSize2_ex,
+				nodeName: '',
+				...scopeParams
+			})
+			if (result.success) {
+				this.tableData2 = result.data.lists
+				// 处理节点类型描述
+				this.tableData2.forEach(item => {
+					this.nodeTypeList.map(sub => {
+						item.nodeType == sub.id && (item.iNodeTypeName = sub.value)
+						item.nodeType = item.nodeType + ''
+					})
+				})
+				this.total2_ex = result.data.page.totalNum
+				// 拷贝数据到规则提取
+				// dataDeepCopy(this.tableData2, this.tableDataBackup, false)
+
+				this.addLoading = false
+			} else {
+				this.tableData2 = []
+				this.total2_ex = 0
+				this.addLoading = false
+			}
+		},
+		// 弹窗分页跳转
+		handleChangeModalPage(page) {
+			this.page2_ex = page
+			this.getNotConfiguredList()
+		},
+		// 改变弹窗分页大小
+		handleChangeModalSize(size) {
+			this.pageSize2_ex = size
+			this.getNotConfiguredList()
+		},
+		// 获取设备类型字典码
+		async getDeviceTypeList() {
+			let result = await this.$api.deviceModeling.getDeviceTypeList({
+				isPage: '0'
+			})
+			if (result.success) {
+				this.deviceTypeList = result.data.lists
+			}
+		},
+		//导入弹窗
+		handleUpload() {
+			this.uploadShow = true
+		},
+		//关闭导入弹窗
+		subShow(modalShow) {
+			this.uploadShow = modalShow
+		},
+		uploadSuccess(data) {
+			if (data) {
+				this.handleResetList()
+			}
+		},
+		devExport() {
+			this.$api.deviceModeling.devExport(qs.stringify({ unitId: this.activeOrgTreeStationId }))
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus">
+.device-modeling-content {
+  width: 100%;
+  // width: 1856px;
+  display: flex;
+  flex-direction: row-reverse;
+  float: left;
+  justify-content: flex-end !important;
+  position: relative;
+
+  .tree {
+    // width: 220px;
+    width: 15%;
+    float: left;
+    background: #fff;
+
+    .ivu-tabs-bar {
+      margin-bottom: 5px;
+    }
+
+    /deep/ .ivu-tree {
+      width: 100%;
+      height: calc(100vh - 213px);
+      overflow-y: auto;
+    }
+  }
+
+  .container {
+    float: left;
+    // width: 1390px;
+    width: 85%;
+    overflow: hidden;
+    /* float: left; */
+    padding-left: 10px;
+
+    .operation {
+      .form-item {
+        margin-bottom: initial;
+      }
+
+      .reset, .delete {
+        margin-left: 10px;
+      }
+
+      .wrap1 {
+        button {
+          margin-right: 10px;
+        }
+      }
+    }
+
+    .ivu-table-wrapper {
+      height: calc(100vh - 360px) !important;
+
+      .ivu-table-body, .ivu-table-overflowY, .ivu-table-tip, .ivu-table-tip td {
+        height: calc(100vh - 400px) !important;
+      }
+
+      .wrap {
+        display: flex;
+        justify-content: space-around !important;
+
+        > i {
+          font-size: 20px;
+        }
+      }
+    }
+
+    .ivu-table .table-row1 td {
+      background-color: #fff;
+    }
+
+    .ivu-table .table-row2 td {
+      background-color: #eff9ff;
+    }
+
+    .ivu-table-row-hover td {
+      background-color: #ddf2ff !important;
+      cursor: pointer;
+    }
+
+    .ivu-page {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  }
+
+  .stretch {
+    // width: 1580px !important;
+  }
+}
+
+.editAndAddModal {
+  .ivu-modal-mask {
+    position: initial !important;
+    top: initial !important;
+    bottom: initial !important;
+    left: initial !important;
+    right: initial !important;
+    background-color: initial !important;
+    height: initial !important;
+    z-index: initial !important;
+  }
+
+  .ivu-modal-wrap {
+    position: initial !important;
+    overflow: initial !important;
+  }
+
+  .ivu-modal {
+    position: absolute !important;
+    top: initial !important;
+    width: 100% !important;
+    z-index: 999;
+  }
+
+  .ivu-modal-header {
+    border-bottom: initial !important;
+    padding: initial !important;
+    line-height: initial !important;
+  }
+
+  .ivu-modal-body {
+    padding: initial !important;
+    font-size: initial !important;
+    line-height: initial !important;
+  }
+
+  .ivu-icon-ios-close::before {
+    content: '\F379' !important;
+  }
+
+  .close {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    font-size: 27px;
+    cursor: pointer;
+  }
+
+  .close:hover {
+    color: #000;
+  }
+}
+
+.batchExtractModal1 {
+  .ivu-modal-content {
+    /* width: 1500px !important; */
+  }
+
+  .extract-wrap {
+    display: flex;
+
+    .node-info {
+      display: flex;
+      justify-content: flex-start;
+
+      /* width: 100%; */
+      .left {
+        width: 220px;
+
+        /deep/ .ivu-tree {
+          height: calc(100vh - 220px);
+          overflow-y: auto;
+        }
+
+        /deep/ .ivu-tabs-nav .ivu-tabs-tab {
+          padding: 9px;
+        }
+
+        /deep/ .ivu-tabs-bar {
+          margin-bottom: 5px;
+        }
+      }
+
+      .right {
+        /* width: 938px; */
+        margin-left: 10px;
+
+        /deep/ .ivu-table-wrapper {
+          height: calc(100vh - 146px) !important;
+          width: 600px !important;
+
+          > .ivu-table {
+            > .ivu-table-body {
+              height: calc(100vh - 187px) !important;
+            }
+
+            > .ivu-table-tip {
+              height: calc(100vh - 187px) !important;
+
+              td {
+                height: calc(100vh - 187px) !important;
+              }
+            }
+          }
+        }
+
+        .ivu-page {
+          margin-top: 10px;
+        }
+      }
+    }
+
+    .action-info {
+      margin-left: 10px;
+
+      /deep/ .ivu-modal-content {
+        width: 1200px !important;
+      }
+
+      /deep/ .ivu-form-item:nth-of-type(2) {
+        .ivu-form-item-label {
+          width: 110px !important;
+        }
+
+        .ivu-form-item-content {
+          margin-left: 110px !important;
+        }
+      }
+
+      /deep/ .ivu-form-item:nth-of-type(3) {
+        .ivu-form-item-label {
+          width: initial !important;
+        }
+
+        .ivu-form-item-content {
+          margin-left: initial !important;
+        }
+      }
+
+      /deep/ .ivu-form-item:nth-of-type(4) {
+        .ivu-form-item-label {
+          width: 85px !important;
+        }
+
+        .ivu-form-item-content {
+          margin-left: 85px !important;
+        }
+      }
+
+      /deep/ .ivu-form-item:nth-of-type(4) {
+        .ivu-input-wrapper {
+          width: 320px;
+        }
+      }
+
+      /deep/ .ivu-form-item:nth-of-type(5) {
+        .ivu-form-item-label {
+          width: 113px !important;
+        }
+
+        .ivu-form-item-content {
+          margin-left: 113px !important;
+        }
+
+        .ivu-select {
+          width: 170px;
+        }
+
+        .ivu-select-dropdown {
+          max-height: 500px !important;
+        }
+      }
+
+      /deep/ .ivu-input-number {
+        /* width: 60px !important; */
+      }
+
+      /deep/ .ivu-table-wrapper {
+        height: calc(100vh - 260px) !important;
+        width: 1045px !important;
+
+        > .ivu-table {
+          > .ivu-table-body {
+            height: calc(100vh - 300px) !important;
+          }
+
+          > .ivu-table-tip {
+            height: calc(100vh - 300px) !important;
+
+            td {
+              height: calc(100vh - 300px) !important;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+</style>

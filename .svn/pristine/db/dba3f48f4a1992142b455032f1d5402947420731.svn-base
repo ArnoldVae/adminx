@@ -1,0 +1,847 @@
+<template>
+	<div class="svgFlowCon">
+		<!-- 变电站树 -->
+		<div class="flow-stationTree">
+			<search-tree ref="org-search-tree" :data="orgTreeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索...">
+				<Icon type="ios-search" slot="suffix" />
+			</search-tree>
+		</div>
+		<!-- 防区列表-->
+		<div class="flow-areaTree">
+			<kw :keyworditmList="keywordList" @pAreaId="pAreaId"></kw>
+		</div>
+		<!-- 表格内容 -->
+		<div class="flow-wrapTable">
+			<!-- 子系统tabs -->
+			<div class="subStyleitem">
+				<el-tabs v-model="activetabName" @tab-click="handletabClick">
+					<el-tab-pane :label="itemSub.subName" v-for="(itemSub, index) in subList" :key="index" :name="itemSub.id">
+						<!-- 应急处置流程 -->
+						<div class="dispostion-flow">
+							<div class="title">
+								应急处置流程
+								<el-button @click="add" type="success" size="small" icon="el-icon-plus">新增</el-button>
+							</div>
+
+							<div class="table">
+								<el-table :data="dispostionData" style="width: 100%" height="300" empty-text="暂无数据" border>
+									<el-table-column prop="vcName" label="点位名称" align="center" width="315">
+										<template slot-scope="scope">
+											<span v-if="editIndex === scope.$index">
+												<el-input size="mini" placeholder="请输入内容" v-model="keySearch" @focus="get($event)"></el-input>
+												<div class="keyList" v-if="MenuShow">
+													<Menu width="auto" mode="vertical">
+														<MenuItem :name="item.id" v-for="(item, index) in filterNodeList" :key="index">
+															<p @click="listClick(item)">{{ item.vcName }}</p>
+														</MenuItem>
+													</Menu>
+												</div>
+											</span>
+											<span v-else>{{ scope.row.vcName }}</span>
+										</template>
+									</el-table-column>
+
+									<el-table-column prop="vcMemo" label="监视值" align="center" width="300">
+										<template slot-scope="scope">
+											<el-select
+												v-model="value"
+												placeholder="请选择"
+												@change="handleEditCommon(scope)"
+												v-if="editIndex === scope.$index"
+												no-data-text="无数据"
+											>
+												<el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"></el-option>
+											</el-select>
+											<span v-else>{{ scope.row.vcMemo }}</span>
+										</template>
+									</el-table-column>
+									<el-table-column prop="longSortid" label="排序" align="center" width="165">
+										<template slot-scope="scope">
+											<el-input size="small" v-model="sortName" placeholder="请输入内容" v-if="editIndex === scope.$index"></el-input>
+											<span v-else>{{ scope.row.longSortid }}</span>
+										</template>
+									</el-table-column>
+									<el-table-column prop="action" label="操作" align="center" width="350">
+										<template slot-scope="scope">
+											<div v-if="editIndex === scope.$index">
+												<el-button type="primary" size="small" icon="el-icon-check" @click="save(scope.row, scope.$index)"
+													>保存</el-button
+												>
+												<el-button type="info" size="small" icon="el-icon-close" @click="editIndex = -1">取消</el-button>
+											</div>
+											<div v-else>
+												<el-button @click="Edit(scope.row)" type="warning" size="small" icon="el-icon-edit-outline">编辑</el-button>
+												<el-button @click="Delete(scope, scope.$index, '处置流程')" type="danger" size="small" icon="el-icon-delete"
+													>删除</el-button
+												>
+												<!-- <el-button
+                          type="text"
+                          size="small"
+                          :disabled="scope.$index===0"
+                          @click="moveUp(scope.$index,scope.row)"
+                        >上移</el-button>
+                        <el-button
+                          type="text"
+                          size="small"
+                          :disabled="scope.$index===(dispostionData.length-1)"
+                          @click="moveDown(scope.$index,scope.row)"
+                        >下移</el-button>-->
+											</div>
+										</template>
+									</el-table-column>
+								</el-table>
+							</div>
+						</div>
+						<!-- 应急启动节点 -->
+						<div class="start-node">
+							<div class="title">
+								应急启动节点
+								<el-button type="success" size="small" icon="el-icon-plus" @click="startAdd">新增</el-button>
+							</div>
+							<div class="table">
+								<el-table :data="startNoneData" style="width: 100%" height="292" empty-text="暂无数据" border>
+									<el-table-column prop="vcName" label="点位名称" align="center" width="315">
+										<template slot-scope="scope">
+											<span v-if="starteditIndex === scope.$index">
+												<el-input size="mini" placeholder="请输入内容" v-model="keySearch" @focus="get($event)"></el-input>
+												<div class="keyList" v-if="MenuShow">
+													<Menu width="auto" mode="vertical">
+														<MenuItem :name="item.id" v-for="(item, index) in filterNodeList" :key="index">
+															<p @click="listClick(item)">{{ item.vcName }}</p>
+														</MenuItem>
+													</Menu>
+												</div>
+											</span>
+											<span v-else>{{ scope.row.vcName }}</span>
+										</template>
+									</el-table-column>
+									<el-table-column prop="vcMemo" label="启动值" align="center" width="300">
+										<template slot-scope="scope">
+											<el-select
+												v-model="startNodevalue"
+												placeholder="请选择"
+												@change="handleEditCommon(scope)"
+												v-if="starteditIndex === scope.$index"
+												no-data-text="无数据"
+											>
+												<el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"></el-option>
+											</el-select>
+											<span v-else>{{ scope.row.vcMemo }}</span>
+										</template>
+									</el-table-column>
+									<el-table-column prop="longSortid" label="排序" align="center" width="165">
+										<template slot-scope="scope">
+											<el-input
+												size="small"
+												v-model="startNodeSortName"
+												placeholder="请输入内容"
+												v-if="starteditIndex === scope.$index"
+											></el-input>
+											<span v-else>{{ scope.row.longSortid }}</span>
+										</template>
+									</el-table-column>
+									<el-table-column prop="action" label="操作" align="center" width="350">
+										<template slot-scope="scope">
+											<div v-if="starteditIndex === scope.$index">
+												<el-button type="primary" size="small" icon="el-icon-check" @click="startNodesave(scope.row, scope.$index)"
+													>保存</el-button
+												>
+												<el-button type="info" size="small" icon="el-icon-close" @click="starteditIndex = -1">取消</el-button>
+											</div>
+											<div v-else>
+												<el-button @click="startNodeEdit(scope.row)" type="warning" size="small" icon="el-icon-edit-outline"
+													>编辑</el-button
+												>
+												<el-button @click="Delete(scope, scope.$index, '启动')" type="danger" size="small" icon="el-icon-delete"
+													>删除</el-button
+												>
+											</div>
+										</template>
+									</el-table-column>
+								</el-table>
+							</div>
+						</div>
+					</el-tab-pane>
+				</el-tabs>
+			</div>
+		</div>
+		<!-- 新增弹框内容 -->
+		<!-- <el-dialog title="选择节点" :visible.sync="dialogVisible" width="50%" class="nodeDialog">
+      <div class="nodeCon">
+        <div class="searchFire">
+          <el-form :inline="true" :model="searchline" class="demo-form-inline">
+            <el-form-item label="点位名称">
+              <el-input v-model="searchline.vcName" placeholder="请输入点位名称"></el-input>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="onSubmit">查询</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+        <div class="searchTable">
+          <el-table :data="tablenodeData" style="width: 100%" @select="selectNode" height="620">
+            <el-table-column type="selection" align="center"></el-table-column>
+            <el-table-column prop="vcName" label="点位名称" align="center"></el-table-column>
+            <el-table-column prop="veMemo" label="值" align="center"></el-table-column>
+          </el-table>
+        </div>
+      </div>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="dialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="dialogVisible = false">确 定</el-button>
+      </span>
+    </el-dialog>-->
+	</div>
+</template>
+
+<script>
+import pinyin from 'pinyin2'
+import kw from '../components/keyword/Keyword'
+export default {
+	data() {
+		return {
+			orgTreeData: [],
+			unitId: '',
+			untidName: '',
+			flowList: [],
+			keywordList: [],
+			subList: [],
+			// 应急处置流程
+			dispostionData: [],
+			options: [],
+			editIndex: -1,
+			activetabName: '',
+			protectAreaId: '',
+			protectAreaName: '',
+			value: '',
+			vcName: '',
+			sortName: '',
+			disNodeid: '',
+			subfirstid: '',
+			//列表下来搜索
+			keySearch: '',
+			MenuShow: false,
+			nodeListsearch: [],
+			pinlist: [],
+			// 新增框框
+			dialogVisible: false,
+			searchline: {
+				vcName: ''
+			},
+			tablenodeData: [],
+			nodeDatas: [],
+			//应急启动节点
+			startNoneData: [],
+			starteditIndex: -1,
+			startNodekeySearch: '',
+			startNodevalue: '',
+			startNodeSortName: ''
+		}
+	},
+	components: {
+		kw
+	},
+	created() {
+		this.getStationTree()
+	},
+	mounted() {
+		// this.pAreaId()
+		this.convertToPinyin()
+	},
+	methods: {
+		// 获取站点树
+		async getStationTree() {
+			let result = await this.$api.svgFlowConfig.getUnitTree({ iFlag: 2 })
+
+			if (result.code == 200) {
+				let flgaNum = 1
+				this._forEach(result.data, true, item => {
+					item.expand = true
+					if (item.flag == flgaNum) {
+						this.unitId = item.id
+						this.untidName = item.title
+						item.selected = true
+						flgaNum = 'a'
+					}
+				})
+				this.orgTreeData = result.data
+				this.getareaList()
+			}
+		},
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		handleStationTree(node) {
+			this.unitId = node[0].id
+			this.untidName = node[0].title
+			this.keywordList = []
+			this.subList = []
+			this.getareaList()
+		},
+		// 防区列表
+		getareaList() {
+			let params = {
+				unitId: this.unitId
+			}
+			this.$api.svgFlowConfig.getareaList(params).then(res => {
+				this.keywordList = []
+				if (res.code == 200) {
+					if (res.data.length == 0) {
+						this.keywordList.push({
+							id: 0,
+							name: '暂无数据'
+						})
+					} else {
+						res.data.forEach(item => {
+							this.keywordList.push({
+								id: item.id,
+								name: item.vcName,
+								protectAreaId: item.protectAreaId
+							})
+						})
+					}
+				}
+			})
+			this.getNodeDatas()
+		},
+		// 查询子系统 及表格
+		pAreaId(val) {
+			// console.log(val);
+			this.protectAreaName = val.name
+			this.protectAreaId = val.protectAreaId
+			this.subList = []
+			if (val) {
+				this.$api.svgFlowConfig
+					.getSubList({
+						dictGroupID: 9001
+					})
+					.then(res => {
+						//    console.log(res);
+						if (res.code == 200) {
+							let subData = res.data.lists[0].dictDataList
+							subData.forEach((item, index) => {
+								this.subList.push({
+									subName: item.vcName,
+									id: String(item.dictID),
+									flag: index
+								})
+							})
+							this.subfirstid = subData[0].dictID
+							this.activetabName = String(subData[0].dictID)
+							this.tableData(String(subData[0].dictID))
+						}
+					})
+			}
+		},
+		//点击tabs
+		handletabClick(tab, event) {
+			// console.log(tab)
+			this.subfirstid = tab.name
+			this.tableData(tab.name)
+		},
+		//表格数据
+		tableData(id) {
+			// console.log(id);
+			// return;
+			this.$api.svgFlowConfig
+				.getSubNodeList({
+					page: {
+						pageNum: '1',
+						pageSize: '100'
+					},
+					fireFlowchartEntity: {
+						protectareaid: this.protectAreaId,
+						intSystemid: id,
+						intStart: '0'
+					}
+				})
+				.then(res => {
+					if (res.code == 200) {
+						let tableDats = res.data.pagedModelList
+						this.dispostionData = tableDats
+					}
+				})
+			this.$api.svgFlowConfig
+				.getSubNodeList({
+					page: {
+						pageNum: '1',
+						pageSize: '100'
+					},
+					fireFlowchartEntity: {
+						protectareaid: this.protectAreaId,
+						intSystemid: id,
+						intStart: '1'
+					}
+				})
+				.then(res => {
+					if (res.code == 200) {
+						let nodeDatas = res.data.pagedModelList
+						this.startNoneData = nodeDatas
+					}
+				})
+		},
+		get(ev) {
+			if (ev.type == 'focus') {
+				this.MenuShow = true
+			}
+		},
+		//搜索用的节点信息
+		getNodeDatas() {
+			this.$api.svgFlowConfig
+				.getNodeDatas({
+					unitId: this.unitId,
+					dictId: 0,
+					flag: 0
+				})
+				.then(res => {
+					if (res.code == 200) {
+						if (res.data) {
+							this.nodeDatas = res.data
+							res.data.forEach(item => {
+								this.nodeListsearch.push({
+									vcName: item.nodeName,
+									id: item.nodeId,
+									vcMemo: item.vcValueDesc
+								})
+							})
+						}
+					}
+					this.convertToPinyin()
+				})
+		},
+		//拼音
+		convertToPinyin() {
+			this.nodeListsearch.forEach(
+				(item => {
+					// console.log(item);
+					const _pinyin = pinyin(item.vcName, {
+						style: pinyin.STYLE_NORMAL //全拼风格
+					})
+					item.pinyin = _pinyin.join('').toLowerCase()
+					item.py = _pinyin
+						.map(item => {
+							return item[0].substr(0, 1)
+						})
+						.join('')
+						.toLowerCase()
+				}).bind(this)
+			)
+			// console.log(this.nodeListsearch);
+		},
+		listClick(items) {
+			// console.log(items);
+			this.options = []
+			this.keySearch = items.vcName
+			this.disNodeid = items.id
+			let selectDatas = items.vcMemo.split('|')
+			selectDatas.forEach(sles => {
+				this.options.push({
+					label: sles.substring(1),
+					value: sles
+				})
+			})
+			// console.log(this.options);
+		},
+		handleEditCommon(index) {
+			// console.log(index)
+		},
+		//编辑
+		Edit(row) {
+			this.options = []
+			let index = this.dispostionData.findIndex(item => {
+				return row.vcName == item.vcName
+			})
+			this.editIndex = index
+			this.keySearch = row.vcName
+			this.value = row.vcMemo
+			this.sortName = row.longSortid
+			if (this.nodeDatas) {
+				this.nodeDatas.forEach(item => {
+					if (this.keySearch == item.nodeName) {
+						let ops = item.vcValueDesc.split('|')
+						ops.forEach(sles => {
+							this.options.push({
+								label: sles.substring(1),
+								value: sles
+							})
+						})
+					}
+				})
+			}
+		},
+		//保存
+		save(item, index) {
+			this.options = []
+			this.dispostionData[index].vcName = this.keySearch //节点名称
+			this.dispostionData[index].vcMemo = this.value.substring(2) //监视值
+			this.dispostionData[index].longSortid = this.sortName //排序
+			this.dispostionData[index].nodeid = this.disNodeid //节点id
+			this.dispostionData[index].protectareaid = this.protectAreaId //防区id
+			this.dispostionData[index].intSystemid = this.subfirstid //属于何种子系统
+			this.dispostionData[index].vcUnitName = this.untidName //变电站名称
+			this.dispostionData[index].vcProtectName = this.protectAreaName //防区名称
+			this.$api.svgFlowConfig
+				.saveNodeData({
+					protectareaid: this.protectAreaId,
+					nodeid: this.disNodeid,
+					id: item.id,
+					intSystemid: this.subfirstid,
+					longSortid: this.sortName,
+					intStart: 0,
+					vcMemo: this.value.substring(2),
+					vcName: this.keySearch,
+					vcUnitName: this.untidName,
+					vcProtectName: this.protectAreaName,
+					floatValue: this.value.substring(0, 1)
+				})
+				.then(res => {
+					if (res.code == 200) {
+						this.$message({
+							message: '保存成功!!!',
+							type: 'success'
+						})
+					}
+				})
+			this.editIndex = -1
+		},
+		//删除
+		Delete(rows, index, type) {
+			if (!rows.row.id) {
+				if (type == '处置流程') {
+					this.dispostionData.splice(index, 1)
+				} else {
+					this.startNoneData.splice(index, 1)
+				}
+			} else {
+				this.$api.svgFlowConfig
+					.deleteData({
+						id: rows.row.id
+					})
+					.then(res => {
+						if (res.code == 200) {
+							if (type == '处置流程') {
+								this.dispostionData.splice(index, 1)
+							} else {
+								this.startNoneData.splice(index, 1)
+							}
+							this.$message({
+								message: '删除成功!!!',
+								type: 'success'
+							})
+						}
+					})
+			}
+		},
+		//上移
+		moveUp(index, row) {
+			var that = this
+			let upDate = that.dispostionData[index - 1]
+			that.dispostionData.splice(index - 1, 1)
+			that.dispostionData.splice(index, 0, upDate)
+		},
+		//下移
+		moveDown(index, row) {
+			var that = this
+			let downDate = that.dispostionData[index + 1]
+			that.dispostionData.splice(index + 1, 1)
+			that.dispostionData.splice(index, 0, downDate)
+			// }
+		},
+		// 新增
+		add() {
+			// this.dialogVisible = true
+			this.dispostionData.push({
+				vcName: '',
+				vcMemo: '',
+				intStart: 0,
+				longSortid: '',
+				nodeid: '',
+				protectareaid: '',
+				intSystemid: '',
+				vcUnitName: '',
+				vcProtectName: ''
+			})
+		},
+		//启动节点--新增
+		startAdd() {
+			this.startNoneData.push({
+				vcName: '',
+				vcMemo: '',
+				intStart: 1,
+				longSortid: '',
+				nodeid: '',
+				protectareaid: '',
+				intSystemid: '',
+				vcUnitName: '',
+				vcProtectName: ''
+			})
+		},
+		//启动节点--编辑
+		startNodeEdit(row) {
+			this.options = []
+			let index = this.startNoneData.findIndex(item => {
+				return row.vcName == item.vcName
+			})
+			this.keySearch = row.vcName
+			this.startNodevalue = row.vcMemo
+			this.startNodeSortName = row.longSortid
+			if (this.nodeDatas) {
+				this.nodeDatas.forEach(item => {
+					if (this.keySearch == item.nodeName) {
+						let ops = item.vcValueDesc.split('|')
+						ops.forEach(sles => {
+							this.options.push({
+								label: sles.substring(1),
+								value: sles
+							})
+						})
+					}
+				})
+			}
+			this.starteditIndex = index
+		},
+		startlistClick(items) {
+			this.MenuShow = false
+			this.options = []
+			this.keySearch = items.vcName
+			this.disNodeid = items.id
+			let selectDatas = items.vcMemo.split('|')
+			selectDatas.forEach(sles => {
+				this.options.push({
+					label: sles.substring(1),
+					value: sles
+				})
+			})
+		},
+		//启动节点--保存
+		startNodesave(item, index) {
+			this.startNoneData[index].vcName = this.keySearch //节点名称
+			this.startNoneData[index].vcMemo = this.startNodevalue.substring(2) //监视值
+			this.startNoneData[index].longSortid = this.startNodeSortName //排序
+			this.startNoneData[index].nodeid = this.disNodeid //节点id
+			this.startNoneData[index].protectareaid = this.protectAreaId //防区id
+			this.startNoneData[index].intSystemid = this.subfirstid //属于何种子系统
+			this.startNoneData[index].vcUnitName = this.untidName //变电站名称
+			this.startNoneData[index].vcProtectName = this.protectAreaName //防区名称
+			this.$api.svgFlowConfig
+				.saveNodeData({
+					protectareaid: this.protectAreaId,
+					nodeid: this.disNodeid,
+					id: item.id,
+					intSystemid: this.subfirstid,
+					longSortid: this.startNodeSortName,
+					intStart: 1,
+					vcMemo: this.startNodevalue.substring(2),
+					vcName: this.keySearch,
+					vcUnitName: this.untidName,
+					vcProtectName: this.protectAreaName,
+					floatValue: this.startNodevalue.substring(0, 1)
+				})
+				.then(res => {
+					if (res.code == 200) {
+						this.$message({
+							message: '保存成功!!!',
+							type: 'success'
+						})
+					}
+				})
+			this.starteditIndex = -1
+		},
+		//弹框确认 导入页面的列表
+		onSubmit() {},
+		//选择节点数据
+		selectNode(selection, row) {
+			console.log(selection)
+		}
+	},
+	computed: {
+		filterNodeList() {
+			let result = []
+			return (result = this.nodeListsearch.filter(item => {
+				if (this.keySearch == '') {
+					return true
+				} else if (/^[\u4e00-\u9fa5]+$/gi.test(this.keySearch) && item.vcName.includes(this.keySearch) && this.keySearch != '') {
+					item.vcName.match(this.keySearch)
+					return true
+				} else if (escape(this.keySearch).indexOf('%u') < 0 && item.py.includes(this.keySearch.toLowerCase()) && this.keySearch != '') {
+					item.vcName.match(this.vcName)
+					return true
+				}
+			}))
+		}
+	}
+}
+</script>
+
+<style lang="stylus" scoped>
+.svgFlowCon {
+  width: 100%;
+  height: calc(100vh - 140px);
+  display: flex;
+  position: relative;
+
+  .flow-stationTree {
+    width: 230px;
+    height: 100%;
+    margin-right: 10px;
+    background-color: #fff;
+    padding: 8px;
+  }
+
+  .flow-areaTree {
+    width: 230px;
+    height: 100%;
+    margin-right: 10px;
+    background-color: #fff;
+    padding: 8px;
+
+    .keyList {
+      width: 100%;
+      height: 680px;
+      margin-top: 10px;
+      overflow-y: auto;
+    }
+  }
+
+  .flow-wrapTable {
+    width: calc(100% - 480px);
+    height: 100%;
+    background-color: #fff;
+    padding: 8px;
+
+    .subStyleitem {
+      width: 100%;
+      height: 100%;
+
+      /deep/ .el-tabs__header {
+        margin: 0;
+      }
+
+      /deep/ .el-tabs .el-tabs__content {
+        width: 100%;
+        height: 690px;
+
+        .el-tab-pane {
+          height: 100%;
+
+          .dispostion-flow {
+            width: 100%;
+            height: 50%;
+
+            .title {
+              width: 100%;
+              height: 45px;
+              font-size: 20px;
+              line-height: 45px;
+              color: #000;
+              background-color: #4e89bb;
+              position: relative;
+
+              .el-button {
+                position: absolute;
+                top: 5px;
+                right: 30px;
+              }
+            }
+
+            .table {
+              width: 100%;
+              height: calc(100% - 40px);
+
+              /deep/ .keyList {
+                position: absolute;
+                width: 285px;
+                height: 155px;
+                overflow-y: auto;
+
+                .ivu-menu-item {
+                  padding: 0;
+                  text-align: left;
+                  padding-left: 10px;
+                }
+              }
+            }
+          }
+
+          .start-node {
+            width: 100%;
+            height: 50%;
+            margin-top: 8px;
+
+            .title {
+              width: 100%;
+              height: 45px;
+              font-size: 20px;
+              line-height: 45px;
+              color: #000;
+              background-color: #4e89bb;
+              user-select: none;
+              position: relative;
+
+              .el-button {
+                position: absolute;
+                top: 5px;
+                right: 30px;
+              }
+            }
+
+            .table {
+              width: 100%;
+              height: calc(100% - 54px);
+
+              /deep/ .keyList {
+                position: absolute;
+                width: 285px;
+                height: 155px;
+                overflow-y: auto;
+
+                .ivu-menu-item {
+                  padding: 0;
+                  text-align: left;
+                  padding-left: 10px;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /deep/ .nodeDialog {
+    .el-dialog {
+      margin-top: 0 !important;
+    }
+
+    .nodeCon {
+      width: 100%;
+      height: 650px;
+
+      .searchFire {
+        width: 100%;
+        height: 50px;
+      }
+
+      .searchTable {
+        margin-top: 10px;
+        width: 100%;
+        height: calc(100% - 50px);
+      }
+    }
+  }
+}
+</style>

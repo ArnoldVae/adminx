@@ -1,0 +1,350 @@
+<template>
+	<div class="transfer-main">
+		<el-row>
+			<el-col :span="12">
+				<div class="transfer-main-left">
+					<div class="title">
+						<el-checkbox v-model="checkAllFlag" @change="handleCheckAll">未配置
+						</el-checkbox>
+					</div>
+					<el-input placeholder="请输入关键字" v-model="filterText"><i slot="prefix" class="el-input__icon el-icon-search"></i>
+					</el-input>
+					<div class="content">
+						<el-tree
+							ref="tree"
+							:data="treeList"
+							empty-text="查询无数据"
+							show-checkbox
+							check-strictly
+							node-key="key"
+							@check-change="checkChange"
+							:props="defaultProps"
+							:filter-node-method="filterNode"
+						>
+						</el-tree>
+						<!--						<Tree :data="treeList" show-checkbox></Tree>-->
+					</div>
+				</div>
+			</el-col>
+			<el-col :span="12">
+				<div class="transfer-main-left">
+					<div class="title"></div>
+					<el-tree
+						ref="tree2"
+						:data="selectedTree"
+						node-key="key"
+						:props="defaultProps"
+						empty-text="暂无配置的视频信息"
+					>
+					</el-tree>
+				</div>
+			</el-col>
+		</el-row>
+	</div>
+</template>
+
+<script>
+	export default {
+		name: 'markdown_page',
+		props: {
+			treeList: {
+				type: Array,
+				required: true
+			}
+		},
+		components: {},
+		data() {
+			return {
+				filterText: '',
+				content: '',
+				checkAllFlag: false,
+				checkNodeList: [],
+				baseData: [
+					{
+						expand: true,
+						title: 'parent 1',
+						children: [
+							{
+								title: 'parent 1-0',
+								expand: true,
+								disabled: true,
+								children: [
+									{
+										title: 'leaf',
+										disableCheckbox: true
+									},
+									{
+										title: 'leaf'
+									}
+								]
+							},
+							{
+								title: 'parent 1-1',
+								expand: true,
+								checked: true,
+								children: [
+									{
+										title: '<span style="color: red">leaf</span>'
+									}
+								]
+							}
+						]
+					}
+				],
+				defaultProps: {
+					children: 'children',
+					label: 'label'
+				},
+				selectedTree: []
+			}
+		},
+		created() {
+
+		},
+		mounted() {
+
+		},
+		watch: {
+			filterText(val) {
+				this.$refs.tree.filter(val)
+			}
+		},
+		methods: {
+			handleCheckAll() {
+				this.checkNodeList = []
+				this.treeList.forEach(item => {
+					this.checkNodeList.push(item.key)
+				})
+				if (this.checkAllFlag) {
+					this.$refs.tree.setCheckedKeys(this.checkNodeList)
+				} else {
+					this.$refs.tree.setCheckedKeys([])
+				}
+			},
+			checkChange(node, stauts) {
+				// 获取树node个数
+				let num = 0
+				let arr = this.selectedTree
+				this.treeList.map(item => {
+					num++
+					if (item.children) {
+						item.children.map(() => {
+							num++
+						})
+					}
+				})
+				// 判断全选状态吧
+				this.checkAllFlag = this.$refs.tree.getCheckedKeys().length == num
+				if (!stauts) {
+					if (!node.children) {
+						let localItem
+						arr.forEach(item => {
+							if (item.key == this.$refs.tree.getNode(node.key).parent.data.key) {
+								localItem = item
+							}
+						})
+						localItem.children.forEach((item, index) => {
+							if (item.key == node.key) {
+								localItem.children.splice(index, 1)
+							}
+						})
+						if (localItem.children.length < 1) {
+							arr.forEach((item, index) => {
+								if (item.key == this.$refs.tree.getNode(node.key).parent.data.key) {
+									arr.splice(index, 1)
+								}
+							})
+						} else {
+							arr.forEach(item => {
+								if (item.key == this.$refs.tree.getNode(node.key).parent.data.key) {
+									item = localItem
+								}
+							})
+						}
+						this.selectedTree = arr
+					} else {
+						this.selectedTree.forEach((item, index) => {
+							if (node.key == item.key) {
+								this.selectedTree.splice(index, 1)
+							}
+						})
+					}
+				} else {
+					// 判断树里面是否已存在该节点父结构
+					if (this.selectedTree.length > 0) {
+						// 如果点击子节点的处理逻辑
+						if (!node.children) {
+							const isHereFlag = arr.some(item => item.key == this.$refs.tree.getNode(node.key).parent.data.key)
+							// 如果存在父节点，则判断子节点是否存在
+							if (isHereFlag) {
+								// const
+								let localItem
+								arr.forEach(item => {
+									if (item.key == this.$refs.tree.getNode(node.key).parent.data.key) {
+										localItem = item
+									}
+								})
+								const isSubHereFlag = localItem.children.some(i => i.key == node.key)
+								if (isSubHereFlag) {
+									return false
+								} else {
+									if (node.key) {
+										localItem.children.push({
+											key: node.key,
+											label: node.label
+										})
+									}
+									arr.forEach(item => {
+										if (item.key == this.$refs.tree.getNode(node.key).parent.data.key) {
+											item = localItem
+										}
+									})
+								}
+							} else {
+								if (!node.children) {
+									let obj = {
+										key: this.$refs.tree.getNode(node.key).parent.data.key,
+										label: this.$refs.tree.getNode(node.key).parent.data.label,
+										children: [node]
+									}
+									if (obj.key) {
+										this.selectedTree.push(obj)
+									}
+								} else {
+									debugger
+									let obj = {
+										key: node.key,
+										label: node.label,
+										children: node.children
+									}
+									if (obj.key) {
+										this.selectedTree.push(obj)
+									}
+								}
+							}
+						} else {
+							if (!node.children) {
+								let obj = {
+									key: this.$refs.tree.getNode(node.key).parent.data.key,
+									label: this.$refs.tree.getNode(node.key).parent.data.label,
+									children: [node]
+								}
+								if (obj.key) {
+									this.selectedTree.push(obj)
+								}
+							} else {
+								const isHere = arr.some(item => item.key == node.key)
+								if (isHere) {
+									this.selectedTree.forEach(item => {
+										if (item.key == node.key) {
+											item = node
+										}
+									})
+								} else {
+									let obj = {
+										key: node.key,
+										label: node.label,
+										children: node.children
+									}
+									if (obj.key) {
+										this.selectedTree.push(obj)
+									}
+								}
+							}
+						}
+					} else {
+						if (!node.children) {
+							let obj = {
+								key: this.$refs.tree.getNode(node.key).parent.data.key,
+								label: this.$refs.tree.getNode(node.key).parent.data.label,
+								children: [node]
+							}
+							if (obj.key) {
+								this.selectedTree.push(obj)
+							}
+						} else {
+							let obj = {
+								key: node.key,
+								label: node.label,
+								children: node.children
+							}
+							if (obj.key) {
+								this.selectedTree.push(obj)
+							}
+						}
+					}
+				}
+			},
+			filterNode(value, data, node) {
+				// 如果什么都没填就直接返回
+				if (!value) return true
+				// 如果传入的value和data中的label相同说明是匹配到了
+				if (data.label.indexOf(value) !== -1) {
+					return true
+				}
+				// 否则要去判断它是不是选中节点的子节点
+				return this.checkBelongToChooseNode(value, data, node)
+			},
+			// 判断传入的节点是不是选中节点的子节点
+			checkBelongToChooseNode(value, data, node) {
+				const level = node.level
+				// 如果传入的节点本身就是一级节点就不用校验了
+				if (level === 1) {
+					return false
+				}
+				// 先取当前节点的父节点
+				let parentData = node.parent
+				// 遍历当前节点的父节点
+				let index = 0
+				while (index < level - 1) {
+					// 如果匹配到直接返回
+					if (parentData.data.label.indexOf(value) !== -1) {
+						return true
+					}
+					// 否则的话再往上一层做匹配
+					parentData = parentData.parent
+					index++
+				}
+				// 没匹配到返回false
+				return false
+			}
+		}
+	}
+</script>
+
+<style lang="stylus" scoped>
+	.transfer-main {
+		width: 100%;
+
+		.el-row {
+			.el-col {
+				padding 10px
+
+				.transfer-main-left {
+					width: 100%;
+					border: 1px solid #d7dde4;
+					height 400px
+					border-top-right-radius 6px
+					border-top-left-radius 6px
+
+					.title {
+						line-height 45px
+						padding 0 10px
+						background-color: #f7f7f7;
+						border-bottom 1px solid #d7dde4
+						border-top-right-radius 6px
+						border-top-left-radius 6px
+						height 45px
+					}
+
+					.content {
+						height 313px
+						overflow auto
+						background white
+					}
+				}
+			}
+		}
+
+	}
+</style>

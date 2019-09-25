@@ -1,0 +1,482 @@
+<template>
+	<div class="sm-type-manage">
+		<div class="top-search">
+			<searche-Header-Wrapper>
+				<form-item
+					title="SM名称"
+					type="text"
+					v-model="searchData.vcName"
+					placeholder="输入SM名称查询"
+					noMBottom
+				></form-item>
+				<Button type="info" size="large" icon="md-search" @click="searchConfig">查询</Button>
+				<Button type="primary" size="large" icon="md-refresh" @click="handleResetData">重置</Button>
+				<Button type="success" size="large" icon="md-add" @click="handleModalShow(0)">新增</Button>
+			</searche-Header-Wrapper>
+		</div>
+		<!-- 表格区 -->
+		<div class="table-content">
+			<Table
+				border
+				ref="selection"
+				:columns="tableColumns"
+				:data="tableData"
+				@on-row-dblclick="dblclick"
+				:height="650"
+			></Table>
+			<!-- 分页 -->
+			<div class="table-page">
+				<div class="page-content">
+					<Page
+						@on-change="handleChangePage"
+						@on-page-size-change="handleChangePageSize"
+						:total="total"
+						:current="page"
+						:page-size="pageSize"
+						show-elevator
+						show-total
+						show-sizer
+					/>
+				</div>
+			</div>
+		</div>
+		<Modal v-model="modalShow" :title="modalTitle" class="add-modal" :mask-closable="false">
+			<Form
+				ref="add-form"
+				:rules="ruleValidate"
+				:model="formData"
+				:label-width="120"
+				label-position="right"
+			>
+				<!-- 网关名称 -->
+				<FormItem label="SM名称" prop="vcName">
+					<Input v-model="formData.vcName" />
+				</FormItem>
+				<!-- 测点组类型ID -->
+				<FormItem label="SM类型ID" prop="smTypeId">
+					<Input v-model="formData.smTypeId" :disabled="!isAdd" />
+				</FormItem>
+				<!-- 默认图标 -->
+				<FormItem label="默认图标" prop="vcIcon">
+					<Input v-model="formData.vcIcon" />
+				</FormItem>
+				<!-- 关联模型ID -->
+				<FormItem label="模型名称" prop="devTypeId">
+					<Select v-model="formData.devTypeId" filterable>
+						<Option
+							v-for="item in devList"
+							:key="item.devTypeId"
+							:value="item.devTypeId + ''"
+						>{{ item.vcName }}</Option>
+					</Select>
+				</FormItem>
+				<!-- 状态 -->
+				<FormItem label="状态">
+					<RadioGroup v-model="formData.iIsEnable">
+						<Radio label="1" value="1">启用</Radio>
+						<Radio label="0" value="0">禁用</Radio>
+					</RadioGroup>
+				</FormItem>
+				<!-- 状态 -->
+				<FormItem label="排序" prop="iSort">
+					<Input v-model="formData.iSort" />
+				</FormItem>
+			</Form>
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button type="primary" size="large" @click="handleSaveSmType">确认</Button>
+			</div>
+		</Modal>
+	</div>
+</template>
+<script>
+export default {
+	name: 'sm-type-manage',
+	components: {},
+	props: {},
+	data() {
+		return {
+			axios: this.$api.smTypeManage,
+			modalShow: false,
+			pageFlag: false,
+			modalTitle: '新增',
+			isAdd: true,
+			formData: {
+				vcName: '',
+				smTypeId: '',
+				vcIcon: '',
+				devTypeId: '',
+				iIsEnable: '1',
+				iSort: ''
+			},
+			searchData: { vcName: '' },
+			devList: [],
+			tableColumns: [
+				{
+					title: 'SM名称',
+					key: 'vcName',
+					minWidth: 110,
+					align: 'center'
+				},
+				{
+					title: 'SM类型ID',
+					key: 'smTypeId',
+					minWidth: 110,
+					maxWidth: 250,
+					align: 'center'
+				},
+				{
+					title: '模型名称',
+					key: 'devName',
+					minWidth: 110,
+					maxWidth: 250,
+					align: 'center'
+				},
+				{
+					title: '默认图标',
+					key: 'vcIcon',
+					minWidth: 110,
+					maxWidth: 200,
+					align: 'center'
+				},
+				{
+					title: '状态',
+					key: 'iIsEnable1',
+					width: 100,
+					align: 'center',
+					render: (h, params) => {
+						return h('div', [params.row.iIsEnable == '1' ? h('p', params.row.iIsEnable1) : h('b', params.row.iIsEnable1)])
+					}
+				},
+				{
+					title: '排序',
+					key: 'iSort',
+					width: 100,
+					align: 'center'
+				},
+				{
+					title: '操作',
+					key: 'action',
+					align: 'center',
+					width: 140,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										icon: 'ios-create-outline'
+									},
+									on: {
+										click: () => {
+											this.handleModalShow(1, params)
+										}
+									}
+								},
+								'编辑'
+							)
+						])
+					}
+				}
+			],
+			tableData: [],
+			ruleValidate: {
+				devTypeId: [{ required: true, message: '该项为必填项', trigger: 'change' }],
+				vcName: [{ required: true, message: '该项为必填项', trigger: 'blur' }, { pattern: /^.{0,255}$/, message: '最多输入255字', trigger: 'change' }],
+				smTypeId: [
+					{ required: true, message: '该项为必填项', trigger: 'blur' },
+					{ pattern: /^[0-9]\d{0,3}$/, message: '请输入四位以内数字ID', trigger: 'change' }
+				],
+				iIsEnable: [{ required: true, message: '该项为必填项', trigger: 'blur' }],
+				iSort: [{ pattern: /^[0-9]\d{0,3}$/, message: '请正确输入排序数字', trigger: 'change' }]
+			},
+			total: 0,
+			page: 1,
+			pageSize: 20
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		modalShow(val) {
+			if (!val) {
+				for (let key in this.formData) {
+					this.formData[key] = ''
+				}
+				this.$refs['add-form'].resetFields()
+				this.formData.iIsEnable = '1'
+			}
+		},
+		searchData: {
+			handler(newVal) {
+				this.pageFlag = false
+			},
+			deep: true
+		}
+	},
+	created() {
+		this.getDevType()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		// 查询
+		searchConfig() {
+			this.pageFlag = true
+			this.getTable(1)
+		},
+		// 重置查询
+		handleResetData() {
+			for (let key in this.searchData) {
+				this.searchData[key] = ''
+			}
+			this.getTable()
+		},
+		// 获取列表
+		getTable(type) {
+			let params = {}
+			if (!this.pageFlag) {
+				params.page = {
+					pageNum: type == 1 ? 1 : this.page,
+					pageSize: this.pageSize
+				}
+
+				params.acSmtypeEntity = {
+					vcName: ''
+				}
+			} else {
+				params.page = {
+					pageNum: type == 1 ? 1 : this.page,
+					pageSize: this.pageSize
+				}
+				params.acSmtypeEntity = {
+					vcName: this.searchData.vcName
+				}
+			}
+			this.axios.getSmType(params).then(res => {
+				if (res.code == 200) {
+					this.tableData = res.data.pagedModelList
+					this.tableData.forEach(item => {
+						item.iIsEnable1 = item.iIsEnable == 1 ? '启用' : '禁用'
+						for (let i = 0; i < this.devList.length; i++) {
+							if (this.devList[i].devTypeId == item.devTypeId) {
+								item.devName = this.devList[i].vcName
+							}
+						}
+					})
+					this.total = res.data.totalCount
+				}
+			})
+		},
+		// 获取模型列表
+		getDevType() {
+			let params = {
+				currentPage: 1,
+				isEnable: '',
+				isPage: 1,
+				pageSize: 100000,
+				vcName: ''
+			}
+			this.axios.getDevType(params).then(res => {
+				if (res.code == 200) {
+					this.devList = res.data.lists
+					this.getTable()
+				}
+			})
+		},
+
+		// 编辑/修改弹窗
+		handleModalShow(type, params) {
+			if (type == 0) {
+				this.modalTitle = '新增'
+				this.isAdd = true
+			} else {
+				this.modalTitle = '编辑'
+				this.isAdd = false
+				let dataObj = JSON.parse(JSON.stringify(params.row))
+				for (let key in this.formData) {
+					this.$set(this.formData, key, dataObj[key])
+				}
+				this.formData.iIsEnable = dataObj.iIsEnable + ''
+				this.formData.smTypeId = dataObj.smTypeId + ''
+				// this.formData.devTypeId = dataObj.devTypeId + ''
+				// this.$set(this.formData, 'iIsEnable', dataObj[iIsEnable] + '')
+				// console.log(params)
+				let flag = false
+				for (let i = 0; i < this.devList.length; i++) {
+					if (this.devList[i].devTypeId == dataObj.devTypeId) {
+						flag = true
+						this.formData.devTypeId = dataObj.devTypeId + ''
+						break
+					}
+				}
+				if (!flag) {
+					this.formData.devTypeId = ''
+				}
+			}
+			this.modalShow = true
+		},
+		dblclick(row) {
+			let data = {
+				row: row
+			}
+			this.handleModalShow(1, data)
+		},
+		handleModalCancel() {
+			this.modalShow = false
+		},
+		// 保存
+		handleSaveSmType() {
+			this.$refs['add-form'].validate(valid => {
+				if (valid) {
+					if (this.isAdd) {
+						let params = JSON.parse(JSON.stringify(this.formData))
+						params.iFlag = 0
+						params.smTypeId = params.smTypeId - 0
+						params.iIsEnable = params.iIsEnable - 0
+						params.devTypeId = params.devTypeId - 0
+						this.axios.saveSmType(params).then(res => {
+							if (res.code == 200) {
+								this.$Message.success('保存成功')
+								this.getTable()
+							} else {
+								this.$Message.warning(res.msg)
+							}
+						})
+					} else {
+						let params = JSON.parse(JSON.stringify(this.formData))
+						params.iFlag = 0
+						params.smTypeId = params.smTypeId - 0
+						params.iIsEnable = params.iIsEnable - 0
+						params.devTypeId = params.devTypeId - 0
+						this.axios.upSmType(params).then(res => {
+							if (res.code == 200) {
+								this.$Message.success('修改成功')
+								this.getTable()
+							} else {
+								this.$Message.warning(res.msg)
+							}
+						})
+					}
+
+					this.modalShow = false
+				} else {
+					this.$Message.error('有必填项未填写,请完整填写')
+				}
+			})
+		},
+		// 分页改变
+		handleChangePage(page) {
+			this.page = page
+			this.getTable()
+		},
+		// 分页条数改变
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			// this.getTable()
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.sm-type-manage {
+  width: 100%;
+  height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+
+  .top-search {
+    width: 100%;
+
+    .ivu-table-wrapper {
+      overflow: visible;
+    }
+
+    .ivu-btn {
+      margin: 0 5px;
+    }
+
+    /deep/.search-header-wrapper .form-item span {
+      font-size: 14px;
+    }
+
+    /deep/.ivu-input-wrapper input {
+      font-size: 14px;
+    }
+  }
+
+  .table-content {
+    width: 100%;
+    flex: 1;
+    position: relative;
+
+    .ivu-table-wrapper {
+      width: 100%;
+      position: absolute;
+      top: 0;
+      height: calc(100% - 30px) !important;
+    }
+
+    /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+      height: calc(100% - 40px) !important;
+    }
+
+    /deep/tr.ivu-table-row-hover td {
+      background-color: #F5F7FA;
+    }
+
+    /deep/.ivu-table {
+      b {
+        color: #ff9900;
+        font-weight: 400;
+      }
+
+      p {
+        color: #19be6b;
+      }
+    }
+
+    /deep/.ivu-btn {
+      font-size: 14px;
+    }
+
+    .table-page {
+      width: 100%;
+      position: absolute;
+      bottom: -15px;
+
+      .page-content {
+        width: 800px;
+        margin-left: 50%;
+        transform: translateX(-35%);
+      }
+    }
+  }
+}
+
+.add-modal {
+  /deep/.ivu-radio-wrapper {
+    font-size: 14px;
+  }
+
+  /deep/.ivu-input-default {
+    font-size: 14px;
+  }
+
+  /deep/.ivu-input-disabled {
+    color: #515a6e;
+  }
+}
+</style>

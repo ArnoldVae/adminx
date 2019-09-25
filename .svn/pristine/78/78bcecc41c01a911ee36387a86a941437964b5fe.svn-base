@@ -1,0 +1,35 @@
+{
+  "v": "7.0.1",
+  "p": {
+    "autoAdjustIndex": true,
+    "hierarchicalRendering": true
+  },
+  "a": {
+    "rotateAsClock": false,
+    "connectActionType": null,
+    "fitContent": true
+  },
+  "d": [
+    {
+      "c": "ht.Node",
+      "i": 4620,
+      "p": {
+        "displayName": "cable-temp",
+        "image": "assets/cable-temp.svg",
+        "position": {
+          "x": -456.59766,
+          "y": -204
+        },
+        "width": 900,
+        "height": 408
+      }
+    }
+  ],
+  "modified": "Sat Aug 10 2019 11:57:22 GMT+0800 (中国标准时间)",
+  "contentRect": {
+    "x": -906.59766,
+    "y": -408,
+    "width": 900,
+    "height": 408
+  }
+}

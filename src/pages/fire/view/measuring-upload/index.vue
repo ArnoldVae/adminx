@@ -1,0 +1,699 @@
+<template>
+	<div class="measuring-upload">
+		<!-- 左侧树 -->
+		<div class="left-tree">
+			<search-tree :data="treeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索...">
+				<Icon type="ios-search" slot="suffix" />
+			</search-tree>
+		</div>
+		<div class="right-content">
+			<div class="tool-bar">
+				<searche-Header-Wrapper>
+					<div class="btn-box">
+						<Button type="success" size="large" icon="md-cloud-upload" @click="handleUploadBtn">导入测点</Button>
+					</div>
+				</searche-Header-Wrapper>
+			</div>
+			<!-- 表格区 -->
+			<div class="table-content">
+				<!-- <Table border ref="selection" :columns="tableColumns" :data="tableData" :height="650"></Table> -->
+				<Table border ref="selection" :columns="tableColumns" @on-row-dblclick="dblclick" :data="tableData" height="700"></Table>
+				<!-- 分页 -->
+				<div class="table-page">
+					<div class="page-content">
+						<Page
+							@on-change="handleChangePage"
+							@on-page-size-change="handleChangePageSize"
+							:total="total"
+							:current="page"
+							:page-size="pageSize"
+							show-elevator
+							show-total
+							show-sizer
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+		<Modal v-model="modalShow" title="文件上传" :mask-closable="false">
+			<div class="upload-content">
+				<Steps class="steps" :current="step" title="文件上传步骤">
+					<Step title="步骤一" content="择上传文件 (仅支持.xls .xlsx 文件)"></Step>
+					<Step title="步骤二" content="选择完毕后点击 '上传' 按钮进行上传"></Step>
+					<Step title="步骤三" content="等待上传完成"></Step>
+				</Steps>
+				<Upload :before-upload="handleUpload" action="//jsonplaceholder.typicode.com/posts/" :accept="accept" :format="Format">
+					<Button class="btn1" type="info" size="large" icon="md-folder">选择文件</Button>
+				</Upload>
+				<!-- <div v-if="file !== null" class="up-box">
+          待上传文件:
+          <span>{{ file.name }}</span>
+        </div>-->
+				<div v-if="file !== null" class="up-box">
+					待上传文件:
+					<span>
+						<div class="del" @click="removeFile">
+							<!-- <Icon type="md-trash" /> -->
+							<i class="el-icon-delete"></i>
+						</div>
+						{{ file.name }}
+					</span>
+				</div>
+			</div>
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button class="btn2" type="success" size="large" icon="md-cloud-upload" @click="upload" :loading="loadingStatus">
+					{{ loadingStatus ? '文件上传中 请稍后...' : '上传' }}
+				</Button>
+			</div>
+		</Modal>
+		<!-- 修改 -->
+		<Modal v-model="upModalShow" title="修改" class="add-modal" :mask-closable="false">
+			<Form ref="up-form" :rules="ruleValidate" :model="upFormData" :label-width="80" label-position="right">
+				<!-- 名称 -->
+				<FormItem label="节点名称" prop="vcName">
+					<Input v-model="upFormData.vcName" placeholder="请输入..." style="width: 400px" />
+				</FormItem>
+				<!-- 单位 -->
+				<FormItem label="数据单位" prop="vcUnit">
+					<Input v-model="upFormData.vcUnit" placeholder="请输入..." style="width: 400px" />
+				</FormItem>
+				<!-- 功能标识 -->
+				<FormItem label="功能标识" prop="func">
+					<Select v-model="upFormData.func" placeholder="请选择">
+						<Option v-for="item in dataFunc" :key="item.dictID" :value="item.dictID + ''" :label="item.vcName">{{ item.vcName }}</Option>
+					</Select>
+				</FormItem>
+				<!-- 排序 -->
+				<FormItem label="排序" prop="sort">
+					<Input v-model="upFormData.sort" placeholder="请输入..." style="width: 400px" />
+				</FormItem>
+			</Form>
+
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button type="primary" size="large" @click="handleSaveStation">确认</Button>
+			</div>
+		</Modal>
+	</div>
+</template>
+<script>
+// import mixinTolls from '@/mixin/tools'
+export default {
+	name: 'measuring-upload',
+	mixins: [],
+	components: {},
+	props: {},
+	data() {
+		return {
+			axios: this.$api.measyringUp,
+			treeData: [],
+			unitId: '',
+			orgId: '',
+			isTree: false,
+			isFile: false,
+			stationName: '',
+			modalShow: false,
+			step: 0,
+			file: null,
+			loadingStatus: false,
+			accept: '.xls,.xlsx',
+			Format: ['.xls', '.xlsx'],
+			upModalShow: false,
+			upFormData: {
+				vcName: '',
+				vcUnit: '',
+				nodeId: '',
+				func: '',
+				sort: ''
+			},
+			ruleValidate: {
+				vcName: [{ required: true, message: '该项为必填项', trigger: 'blur' }],
+				vcUnit: [{ required: true, message: '该项为必填项', trigger: 'blur' }],
+				func: [{ required: true, message: '该项为必填项', trigger: 'blur' }],
+				sort: [{ pattern: /^[0-9]\d{0,3}$/, message: '请正确输入排序数字', trigger: 'change' }]
+			},
+			tableColumns: [
+				{
+					title: '变电站',
+					key: 'unitName',
+					width: 150,
+					align: 'center'
+				},
+				{
+					title: '装置名称',
+					key: 'equipmentName',
+					minWidth: 180,
+					maxWidth: 250,
+					align: 'center'
+				},
+				{
+					title: '节点名称',
+					minWidth: 200,
+					maxWidth: 250,
+					key: 'vcName',
+					align: 'center'
+				},
+				{
+					title: '系统地址',
+					key: 'systemAddress',
+					minWidth: 95,
+					maxWidth: 150,
+					align: 'center'
+				},
+				{
+					title: '点位地址',
+					key: 'address',
+					minWidth: 95,
+					maxWidth: 150,
+					align: 'center'
+				},
+				{
+					title: '节点归属子系统',
+					key: 'systemType1',
+					minWidth: 150,
+					maxWidth: 200,
+					align: 'center'
+				},
+				{
+					title: '数据单位',
+					key: 'vcUnit',
+					width: 100,
+					align: 'center'
+				},
+				{
+					title: '值',
+					key: 'fvalue',
+					width: 80,
+					align: 'center'
+				},
+				{
+					title: '四遥类型',
+					key: 'type1',
+					minWidth: 70,
+					align: 'center'
+				},
+				{
+					title: '功能标识',
+					key: 'func1',
+					minWidth: 150,
+					maxWidth: 200,
+					align: 'center'
+				},
+				{
+					title: '标识',
+					key: 'flag',
+					width: 70,
+					align: 'center'
+				},
+				{
+					title: '安装位置',
+					key: 'location',
+					minWidth: 150,
+					maxWidth: 200,
+					align: 'center'
+				},
+				{
+					title: '状态',
+					key: 'isEnable1',
+					align: 'center',
+					width: 80,
+					render: (h, params) => {
+						return h('div', [params.row.isEnable == '1' ? h('p', params.row.isEnable1) : h('b', params.row.isEnable1)])
+					}
+				},
+				{
+					title: '排序',
+					key: 'sort',
+					width: 70,
+					align: 'center'
+				},
+				{
+					title: '备注',
+					key: 'vcMemo',
+					width: 100,
+					align: 'center'
+				},
+				{
+					title: '操作',
+					key: 'action',
+					align: 'center',
+					width: 100,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										size: 'small'
+									},
+									style: {
+										// marginRight: '5px'
+									},
+									on: {
+										click: () => {
+											this.handleUpModalShow(params)
+										}
+									}
+								},
+								'编辑'
+							)
+						])
+					}
+				}
+			],
+			tableData: [], // 表格数据
+			dataTyppe: [], // 字典四遥类型
+			dataSystemType: [], // 字典节点归属子系统
+			dataFunc: [], // 字典 功能标识
+
+			total: 0,
+			page: 1,
+			pageSize: 20
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		modalShow(val) {
+			if (!val) {
+				this.file = null
+				this.isFile = false
+				this.loadingStatus = false
+				this.step = 0
+			}
+		},
+		upModalShow(val) {
+			if (!val) {
+				;(this.upFormData.vcName = ''), (this.upFormData.vcUnit = ''), (this.upFormData.func = ''), (this.upFormData.sort = '')
+				this.$refs['up-form'].resetFields()
+			}
+		}
+	},
+	created() {
+		this.init()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		init() {
+			this.findDic() // 获取字典
+			// this.getLocal() // 获取枚举
+			this.getStationTree() // 获取站点树
+		},
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		// 获取站点树
+		async getStationTree() {
+			let result = await this.axios.getUnitTree({ iFlag: 2 })
+			if (result.code == 200) {
+				// this.unitId = result.data[0].id
+				let flgaNum = 1
+				this._forEach(result.data, true, item => {
+					item.expand = true
+					if (item.flag == flgaNum) {
+						this.unitId = item.id
+						item.selected = true
+						flgaNum = 'a'
+					}
+				})
+				if (this.unitId) {
+					this.isTree = true
+				}
+				this.treeData = result.data
+				this.getTable()
+			}
+		},
+		// 站点树点击事件
+		handleStationTree(data) {
+			if (data[0].flag == 0) {
+				// 如果不是变电站
+				// this.unitId = ''
+				this.orgId = data[0].id
+				this.isTree = false // 新增不能点击
+				this.getTable()
+			} else {
+				// 是变电站
+				this.unitId = data[0].id
+				this.orgId = ''
+				this.isTree = true
+				this.getTable()
+			}
+
+			// this.stationName = data[0].title
+		},
+		// 文件上传弹窗点击
+		handleUploadBtn() {
+			if (this.isTree) {
+				this.modalShow = true
+			} else {
+				this.$Message.warning('请选择左侧变电站')
+			}
+		},
+		// 选择文件
+		handleUpload(file) {
+			// 添加文件
+			this.file = file
+			this.step = 1
+			this.isFile = true
+			return false
+		},
+		// 上传提交
+		upload() {
+			// 点击上传
+			if (this.isFile) {
+				let fileName = this.file.name.substring(this.file.name.length - 3)
+				let fileName1 = this.file.name.substring(this.file.name.length - 4)
+				if (fileName == 'xls' || fileName == 'XLS' || fileName1 == 'xlsx' || fileName1 == 'XLSX') {
+					this.loadingStatus = true
+					this.step = 2
+					let params = new FormData() // 创建form对象
+					params.append('fireNodeExcel', this.file) // 通过append向form对象添加数据
+					params.append('unitId', this.unitId) // 添加变电站id
+					let config = { 'Content-Type': 'multipart/form-data' } // 添加请求头
+					this.axios
+						.uploadFile(params, config)
+						.then(res => {
+							if (res.code == 200) {
+								this.file = null
+								this.loadingStatus = false
+								this.$Message.success({ duration: 3, content: '文件上传成功' })
+								this.step = 1
+								this.modalShow = false
+								this.getTable()
+							} else {
+								this.file = null
+								this.loadingStatus = false
+								this.step = 1
+								this.modalShow = false
+								this.$Message.error(res.msg)
+							}
+						})
+						.catch(error => {
+							this.file = null
+							this.loadingStatus = false
+							this.step = 1
+							this.modalShow = false
+							this.$Message.error(error.response.data.msg)
+							console.log(error.response)
+						})
+				} else {
+					this.file = null
+					this.isFile = false
+					this.step = 0
+					this.$Message.warning('请选择.xls或.xlsx格式的文件')
+				}
+			} else {
+				this.$Message.warning('请选择需要上传的文件')
+			}
+		},
+		// 获取列表
+		getTable() {
+			let params = {
+				unitId: this.unitId,
+				// orgId: this.orgId,
+				currentPage: this.page,
+				pageSize: this.pageSize
+			}
+			this.axios.getDataList(params).then(res => {
+				if (res.code == 200 && res.data) {
+					res.data.list.forEach(item => {
+						// 启用禁用
+						item.isEnable1 = item.isEnable == 1 ? '启用' : item.isEnable == 0 ? '禁用' : item.isEnable
+						for (let i = 0; i < this.dataSystemType.length; i++) {
+							if (item.systemType == this.dataSystemType[i].dictID) {
+								item.systemType1 = this.dataSystemType[i].vcName
+							}
+						}
+						for (let j = 0; j < this.dataTyppe.length; j++) {
+							if (item.type == this.dataTyppe[j].id) {
+								item.type1 = this.dataTyppe[j].value
+							}
+						}
+						for (let k = 0; k < this.dataFunc.length; k++) {
+							if (item.func == this.dataFunc[k].dictID) {
+								item.func1 = this.dataFunc[k].vcName
+							}
+						}
+					})
+					this.tableData = res.data.list
+
+					this.total = res.data.total
+				}
+			})
+			// console.log(this.dataFunc)
+		},
+		// 修改/编辑
+		handleModalShow() {},
+		// 删除
+		handleRemove() {
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除所选项?',
+				onOk: () => {
+					this.$Message.success('删除成功')
+				},
+				onCancel: () => {}
+			})
+		},
+		removeFile() {
+			this.file = null
+			this.step = 0
+			this.isFile = false
+		},
+		// 弹窗取消
+		handleModalCancel() {
+			this.modalShow = false
+			this.upModalShow = false
+		},
+		handleUpModalShow(params) {
+			let tableData = JSON.parse(JSON.stringify(params.row))
+			for (let key in this.upFormData) {
+				this.upFormData[key] = tableData[key]
+				// this.upFormData[key] = params.row[key]
+			}
+			this.upFormData.func = tableData.func + ''
+
+			this.upModalShow = true
+			console.log(this.upFormData)
+		},
+
+		handleSaveStation() {
+			// console.log(this.upFormData)
+			this.validateForm('up-form', () => {
+				let params = JSON.parse(JSON.stringify(this.upFormData))
+				this.axios.upTableData(params).then(res => {
+					if (res.code == 200) {
+						this.$Message.success('修改成功')
+						this.getTable()
+						this.upModalShow = false
+					} else {
+						this.$Message.warning(res.msg)
+						this.upModalShow = false
+					}
+				})
+			})
+		},
+		// 双击表格修改弹窗
+		dblclick(row) {
+			let data = {
+				row: row
+			}
+			this.handleUpModalShow(data)
+		},
+		// 查询字典组列表
+		findDic() {
+			this.axios.findDicList({ dictGroupID: 9001 }).then(res => {
+				if (res.data && res.code == 200) {
+					this.dataSystemType = res.data
+				}
+			})
+			this.axios.findDicList({ dictGroupID: 9003 }).then(res => {
+				if (res.data && res.code == 200) {
+					this.dataFunc = res.data
+				}
+			})
+		},
+		getLocal() {
+			this.$api.getLocalData().then(res => {
+				this.dataTyppe = res.data.nodeTypeList
+				// console.log(res.data.nodeTypeList)
+			})
+		},
+
+		// 分页改变
+		handleChangePage(page) {
+			this.page = page
+			this.getTable()
+		},
+		// 分页条数改变
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getTable()
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.measuring-upload {
+  width: 100%;
+  // height: calc(100vh - 160px);
+
+  .left-tree {
+    width: 240px;
+    height: calc(100vh - 150px) !important;
+    background-color: #fff;
+    border: 10px solid #fff;
+    overflow: auto;
+    float: left;
+  }
+
+  .right-content {
+    width: calc(100% - 250px) !important;
+    height: 100%;
+    float: left;
+    margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+
+    .tool-bar {
+      .btn-box {
+        .ivu-btn {
+          margin-right: 10px;
+        }
+      }
+    }
+
+    .table-content {
+      width: 100%;
+      // flex: 1;
+      // position: relative;
+
+      /deep/ .ivu-table-wrapper {
+       	height: calc(100vh - 280px) !important;
+		.ivu-table-body,
+		.ivu-table-overflowY,
+		.ivu-table-tip,
+		.ivu-table-tip td {
+			height: calc(100vh - 320px) !important;
+		}
+      }
+
+      // /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+      //   height: calc(100% - 40px) !important;
+      // }
+	//   /deep/.ivu-table-tip{
+	// 	   height: calc(100% - 40px) !important;
+	//   }
+
+      /deep/.ivu-table {
+        p {
+          color: #19be6b;
+        }
+
+        b {
+          font-weight: 400;
+          color: #ff9900;
+        }
+
+        i {
+          font-style: normal;
+        }
+      }
+
+      /deep/tr.ivu-table-row-hover td {
+        background-color: #F5F7FA;
+      }
+
+      /deep/.ivu-btn {
+        font-size: 14px;
+      }
+
+      .table-page {
+        width: 100%;
+        // position: absolute;
+       	margin-top:15px;
+        bottom: -15px;
+
+        .page-content {
+          width: 800px;
+          margin-left: 50%;
+          transform: translateX(-50%);
+        }
+      }
+    }
+  }
+}
+
+.upload-content {
+  width: 100%;
+  height: 300px;
+
+  .steps {
+    margin-left: 30px;
+    margin-bottom: 30px;
+  }
+
+  .up-box {
+    margin-left: 50px;
+    font-size: 16px;
+    color: #515a6e;
+    margin-top: 30px;
+
+    span {
+      font-size: 16px;
+      margin-top: 10px;
+      color: #464c5b;
+      font-weight: 700;
+      display: block;
+
+      .del {
+        float: left;
+        display: inline-block;
+        width: 30px;
+        text-align: center;
+        font-size: 18px;
+        line-height: 100%;
+        color: #2b85e4;
+        cursor: pointer;
+
+        &:hover {
+          color: #ed4014;
+        }
+      }
+    }
+  }
+
+  .btn1 {
+    width: 400px;
+    margin: 10px 10px 10px 50px;
+  }
+}
+</style>

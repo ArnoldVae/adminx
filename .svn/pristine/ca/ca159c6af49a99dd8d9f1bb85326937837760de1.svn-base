@@ -1,0 +1,54 @@
+import axios from '@/config/api.request'
+
+export default {
+	// 获取树结构
+	getTreeData(params) {
+		return axios.request({
+			url: 'sys/dept/tree',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取表格数据
+	getTableList(params) {
+		return axios.request({
+			url: 'maintenance/co/page',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 新增维保单位
+	addMaintenanceDate(params) {
+		return axios.request({
+			url: 'maintenance/co/saveOrUpdate',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 删除维保单位
+	delMaintenanceDate(params) {
+		return axios.request({
+			url: 'maintenance/co/del_co',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// headers: { 'Content-type': 'application/json; charset=utf-8' },
+	// 获取部门所有人员
+	getPersons(params) {
+		return axios.request({
+			url: 'sys/dept/user',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	
+	//维保人员新增
+	addPerson(params) {
+		return axios.request({
+			url: 'maintenance/co/user_saveOrUpdate',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+    }
+}

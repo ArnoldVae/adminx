@@ -1,0 +1,585 @@
+<template>
+  <div class="add-edit-scene">
+    <div class="dev-tree-wrapper">
+      <div>
+        <!-- <search-tree
+					ref="search-tree"
+					:data="devTreeData"
+					placeholder="输入关键词搜索..."
+					@on-select-change="handleSceneTreeSelect"
+				>
+					<Icon type="ios-search" slot="suffix" />
+				</search-tree>-->
+        <el-input placeholder="输入关键词搜索"
+                  v-model="filterText"></el-input>
+
+        <el-tree class="filter-tree"
+                 :data="devTreeData"
+                 :props="defaultProps"
+                 default-expand-all
+                 :filter-node-method="filterNode"
+                 @node-click="handleSceneTreeSelect"
+                 ref="tree"></el-tree>
+      </div>
+    </div>
+
+    <div class="scene-info-wrapper">
+      <div class="scene-form">
+        <com-form ref="scene-form"
+                  v-model="sceneForm"
+                  :items="sceneFormItems"></com-form>
+      </div>
+
+      <!-- 表格 -->
+      <element-table :columns="columns"
+                     height="400px"
+                     :data="tableData"
+                     border
+                     @on-delete="handleDeleteNode"></element-table>
+    </div>
+  </div>
+</template>
+<script>
+import elementTable from '_b/element-table'
+import mixinTolls from '@common/mixin/tools'
+import { setTimeout } from 'timers'
+export default {
+	name: 'add-edit-scene',
+	mixins: [mixinTolls],
+	components: {
+		elementTable
+	},
+	props: {
+		sceneType: Array,
+		station: Object,
+		sceOrg: Object,
+		scene: Object,
+		editScene: Object,
+		isSubmit: Boolean,
+		show: {
+			type: Boolean,
+			required: true
+		},
+		type: {
+			type: String,
+			required: true
+		}
+	},
+	data() {
+		return {
+			http: this.$api.sceneConfig,
+			filterText: '',
+			defaultProps: {
+				children: 'children',
+				label: 'label'
+			},
+			devTreeData: [],
+			devTreeDataSource: '',
+
+			// 表单
+			sceneForm: {
+				station: '',
+				sceneId: '',
+				vcCode: '',
+				vcName: '',
+				iType: '2222',
+				vcMemo: ''
+			},
+			sceneFormItems: [
+				{ label: '站端', prop: 'station', disabled: true },
+				{
+					label: '场景编号',
+					prop: 'vcCode',
+					rules: [
+						{ required: true, message: '该项为必填项', trigger: 'change' },
+						{ pattern: /^.{0,31}$/, message: '最多输入32字', trigger: 'change' }
+					]
+				},
+				{
+					label: '场景名称',
+					prop: 'vcName',
+					rules: [
+						{ required: true, message: '该项为必填项', trigger: 'change' },
+						{ pattern: /^.{0,127}$/, message: '最多输入128字', trigger: 'change' }
+					]
+				},
+				{
+					label: '场景类型',
+					prop: 'iType',
+					type: 'select',
+					options: [],
+					setings: { value: 'id', label: 'value' },
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+				},
+				{ label: '备注', prop: 'vcMemo', type: 'textarea', rules: [{ pattern: /^.{0,31}$/, message: '最多输入32字', trigger: 'change' }] }
+			],
+
+			// 表格
+			columns: [
+				{ label: '站端', prop: 'station', width: 200 },
+				{ label: '设备名称', prop: 'devName' },
+				{ label: '节点名称', prop: 'devNode' },
+				{ label: '预置位Id', prop: 'param1', width: 120 },
+				{ label: '参数2', prop: 'param2', width: 120 },
+				{ label: '操作', prop: 'action', width: 140, deleteShow: true }
+			],
+			tableData: [],
+
+			// 当前活动的 设备节点
+			currentDevNode: null
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		sceneType(val) {
+			// console.log('sceneType at son：', val)
+			// 设置 待选类型数据
+			let targetIndex = this.getTargetIndexByKey(this.sceneFormItems, 'prop', 'iType')
+			this.sceneFormItems[targetIndex].options = val
+		},
+		show: {
+			handler(val) {
+				if (val) {
+					this.filterText = ''
+					if (this.station) this.sceneForm.station = this.station.title
+					this.handleAddOrEditScene()
+				} else {
+					this.resetComForm(
+						this.sceneForm,
+						{
+							iType: '2222'
+						},
+						'scene-form'
+					)
+
+					this.tableData = []
+					this.devTreeData = []
+				}
+			}
+		},
+
+		isSubmit(val) {
+			this.submitSceneInfo()
+		},
+		filterText(val) {
+			this.$refs.tree.filter(val)
+		}
+	},
+	created() {},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		filterNode(value, data) {
+			if (!value) return true
+			return data.label.indexOf(value) !== -1
+		},
+		handleAddOrEditScene() {
+			let text = this.type == 'add-scene' ? '添加场景' : '修改场景'
+			// console.log(
+			// 	text,
+			// 	'station ==',
+			// 	this.station.title,
+			// 	' sceOrg：',
+			// 	this.sceOrg.title,
+			// 	' scene: ',
+			// 	this.scene ? this.scene.title : this.scene
+			// )
+
+			let params = {
+				unitId: this.station.id
+			}
+
+			this.http.getDevTreeByUnitId(params).then(res => {
+				if (res.code == 200) {
+					let { id, pid, title } = this.station
+					let devTreeData = [
+						{
+							id,
+							pid,
+							title,
+							expand: true,
+							children: this.mapSourceToData(res.data)
+						}
+					]
+					this._forEach(devTreeData, true, item => {
+						item.label = item.title
+					})
+					this.devTreeDataSource = JSON.stringify(devTreeData) // 保留源数据
+
+					// 如果是编辑 则需要过滤掉表格中的 node
+					if (this.type == 'edit-scene') this.editSceneInitInfo()
+					else this.devTreeData = devTreeData
+				}
+			})
+		},
+		// 如果是编辑还要获取 场景下面的 设备 list
+		editSceneInitInfo() {
+			// console.log(this.editScene, '=====')
+
+			for (let k in this.sceneForm) {
+				// console.log('sceneForm key：', k)
+				if (k == 'iType') {
+					this.sceneForm[k] = this.editScene['type']
+				} else {
+					this.sceneForm[k] = this.editScene[k]
+				}
+			}
+
+			// 获取场景绑定 的设备
+			let params = {
+				unitId: this.station.id,
+				sceneId: this.scene.id
+			}
+			this.http.getSceneDevList(JSON.stringify(params)).then(res => {
+				// console.log(res)
+				if (res.code == 200) {
+					let sourceData = JSON.parse(this.devTreeDataSource)
+					let tempArr = []
+
+					res.data.forEach(item => {
+						// console.log(item)
+						// if (item.nodeId != '') {
+						// 	sourceData = this.findTargetNodeDelete(sourceData, item.nodeId, item.param1)
+						// 	tempArr.push(this.setTableRow(this.currentDevNode, item.nodeName, item.mPresetInfoId))
+						// } else {
+						// 	this.$Message.error({
+						// 		content: '当前场景配置错误,nodeId为空',
+						// 		duration: 10
+						// 	})
+						// }
+						if (item.nodeId != '') {
+							sourceData = this.findTargetNodeDelete(sourceData, item.nodeId, item.param1)
+							tempArr.push(this.setTableRow(this.currentDevNode, item.nodeName, item.mPresetInfoId))
+						} else {
+							console.log(item)
+							// sourceData = this.findTargetNodeDelete(sourceData, item.nodeId, item.param1)
+							item.station = this.station.title
+							item.param1 = item.param1 == 0 ? '' : item.param1
+							item.param2 = item.param1 == 0 ? '' : item.param2
+							item.devName = this.getNameByDevId(sourceData, item.devId)
+							tempArr.push(item)
+						}
+					})
+
+					this.devTreeData = sourceData
+					this.tableData = tempArr
+				} else this.$Message.warning(`获取设备预置位错误：${res.msg}`)
+			})
+		},
+		getNameByDevId(data, id) {
+			let name = ''
+			this._forEach(data, id, item => {
+				if (item.id == id) {
+					name = item.title
+				}
+			})
+			return name
+		},
+		setTable(data) {},
+		// 设备树点击
+		handleSceneTreeSelect(data) {
+			console.log(data)
+			if (data.flagName != 'node' && data.flagName != 'preset') return
+			// if (data[0].flagName != 'node') {
+			// 设置 表格 row
+			this.tableData.push(this.setTableRow(data))
+
+			// 过滤点击的 node
+			this.devTreeData = this.findTargetNodeDelete(this.devTreeData, data.id)
+			// }
+			let text = this.filterText
+			this.filterText = ''
+
+			// setTimeout(() => {
+			// 	this.filterText = text
+			// }, 50)
+			this.$nextTick(() => {
+				this.filterText = text
+			})
+		},
+		// 表格 点击删除节点
+		handleDeleteNode(row, index) {
+			// 将所选中的 row 删除
+			this.tableData.splice(index, 1)
+			row.source.selected = false
+
+			// 将 row 的 source 还给 tree
+			this.getParentNodeByPid(this.devTreeData, row.pid, parent => {
+				parent.children.push(row.source)
+			})
+		},
+
+		submitSceneInfo() {
+			// console.log(this.disposeParams())
+			this.validateComForm('scene-form', () => {
+				let params = this.disposeParams()
+				let text = ''
+				let request = ''
+
+				this.type == 'add-scene'
+					? ((text = '添加'), (request = 'addSceneInfo'))
+					: ((text = '编辑'), (request = 'editSceneInfo'), (params['sceneId'] = this.sceneForm.sceneId))
+
+				console.log(`${text} params: `, params)
+
+				this.http[request](params)
+					.then(res => {
+						if (res.code == 200) {
+							this.$Message.success(`${text}成功`)
+							this.$emit('on-success')
+						} else this.$Message.warning(res.msg)
+					})
+					.catch(error => {
+						this.$Message.error(error.response.data.msg)
+					})
+			})
+		},
+		disposeParams() {
+			let { vcName, vcCode, iType, vcMemo } = this.sceneForm
+			let obj = {
+				unitId: this.station.id,
+				sceneOrgId: this.sceOrg.id,
+				vcName,
+				vcCode,
+				iType,
+				vcMemo
+			}
+
+			if (this.tableData.length) {
+				obj['sceneDevInputDtoList'] = this.tableData.map(item => {
+					// console.log(item)
+					let { devId, nodeId, param1, flagName } = item
+					// console.log(flagName)
+					let paramsObj = {}
+					if (flagName == 'node') {
+						paramsObj.devId = devId
+						paramsObj.nodeId = nodeId
+					} else {
+						paramsObj.devId = devId
+						paramsObj.nodeId = nodeId
+						paramsObj.param1 = param1
+					}
+					return paramsObj
+				})
+			}
+
+			return obj
+		},
+
+		// tools =============
+		// 根据树节点的原数据 添加给表格
+		setTableRow(treeNode, api, yzw) {
+			// console.log(treeNode)
+			let { title, id, pid, flagName } = treeNode
+			let { title: devName, id: devId } = this.getCurrentDevByPid(treeNode.pid)
+			let pName =
+				treeNode.flagName == 'preset' && !api
+					? this.getPname(this.devTreeData, treeNode.pid)
+					: treeNode.flagName == 'node' && !api
+					? title
+					: api
+					? api
+					: title
+			// console.log(this.getPname(this.devTreeData, treeNode.pid))
+
+			return {
+				id,
+				pid,
+				station: this.station.title,
+				devName,
+				devId,
+				devNode: pName,
+				nodeId: treeNode.flagName == 'preset' ? treeNode.pid : treeNode.id,
+				param1:
+					treeNode.flagName == 'preset' && !api ? treeNode.id : treeNode.flagName == 'node' && !api ? '' : treeNode.flagName == 'preset' ? yzw : '',
+				param2: '',
+				flagName,
+				source: treeNode
+			}
+		},
+		getPname(data, id) {
+			let name = ''
+			this._forEach(data, true, item => {
+				if (item.id == id) {
+					name = item.title
+				}
+			})
+			return name
+		},
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		// 找到对应的树节点 过滤掉
+		findTargetNodeDelete(source, nodeId, param1) {
+			// console.log(nodeId)
+			// console.log(param1)
+			return source.filter(item => {
+				if (!item.children.length) {
+					if (param1 != 0 && !!item.param1) {
+						if (item.param1 == param1) {
+							this.currentDevNode = item
+						} else {
+							return item
+						}
+					} else if (nodeId && item.id != nodeId) {
+						return item
+					} else {
+						this.currentDevNode = item
+					}
+					// if (!nodeId) {
+					// 	this.currentDevNode = item
+					// }
+
+					// if (item.id != nodeId) return item
+					// else this.currentDevNode = item
+				} else {
+					item['children'] = this.findTargetNodeDelete(item.children, nodeId, param1)
+					return item
+				}
+			})
+		},
+		// 获取活动的 设备
+		getCurrentDevByPid(pid) {
+			let dev = null
+			let rootSource = JSON.parse(this.devTreeDataSource)
+			function temp(source, pid) {
+				source.forEach(item => {
+					if (item.id == pid) {
+						if (item.flagName == 'equipment') {
+							dev = item
+						} else {
+							temp(rootSource, item.pid)
+						}
+					} else {
+						temp(item.children, pid)
+					}
+				})
+			}
+
+			temp(rootSource, pid)
+			return dev
+		},
+		// 获取 父级节点 根据 pid
+		getParentNodeByPid(source, pid, callback) {
+			source.forEach(item => {
+				if (item.id == pid) {
+					callback && callback(item)
+				} else {
+					this.getParentNodeByPid(item.children, pid, callback)
+				}
+			})
+		},
+
+		// 源数据映射为需要的数据
+		mapSourceToData(source) {
+			return source.map(item => {
+				item['expand'] = true
+				item['title'] = item.text
+
+				if (item.children.length == 0) {
+					return item
+				} else {
+					item['children'] = this.mapSourceToData(item.children)
+					return item
+				}
+			})
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.add-edit-scene {
+  height: 620px;
+  flex-align();
+
+  .dev-tree-wrapper {
+    create-wrap(300px, 100%, true, true);
+    margin-right: 10px;
+    background-color: #fff;
+    padding: 8px;
+    position: relative;
+
+    > div {
+      overflow-y: auto;
+      width: 100%;
+      height: 100%;
+    }
+
+    /deep/.ivu-input-wrapper {
+      width: 284px;
+      z-index: 99;
+      top: 8px;
+      left: 50%;
+      position: absolute;
+      transform: translateX(-50%);
+    }
+
+    /deep/.el-tree-node>.el-tree-node__children {
+      overflow: visible;
+    }
+  }
+
+  .scene-info-wrapper {
+    width: calc(100% - 310px);
+    height: 100%;
+
+    .scene-form {
+      border-radius: 4px;
+      padding: 10px;
+
+      /deep/.com-form {
+        .ivu-form {
+          flex-align();
+          flex-wrap: wrap;
+
+          .ivu-form-item {
+            width: calc(50% - 10px);
+            margin-right: 20px;
+
+            &:nth-of-type(2n) {
+              margin-right: 0;
+            }
+
+            &:first-of-type {
+              input {
+                color: #515a6e;
+              }
+            }
+
+            &:last-of-type {
+              width: 100%;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+</style>
+<style lang="stylus"></style>

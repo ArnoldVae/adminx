@@ -1,0 +1,50 @@
+{
+  "modified": "Fri Jul 19 2019 09:25:51 GMT+0800 (中国标准时间)",
+  "dataBindings": [
+    {
+      "attr": "alarmLevel",
+      "valueType": "Number",
+      "defaultValue": 0,
+      "name": "报警等级"
+    },
+    {
+      "attr": "blink.visible",
+      "valueType": "Boolean",
+      "name": "闪烁"
+    }
+  ],
+  "width": 32,
+  "height": 32,
+  "comps": [
+    {
+      "type": "image",
+      "name": {
+        "func": "__ht__function(data, view) {\nvar status = data.a('alarmLevel');\r\nif(status==0){\r\n    return 'symbols/QIF/yewei0.json';\r\n}\r\nreturn 'symbols/QIF/yewei1.json';\n}",
+        "value": "symbols/QIF/yewei0.json"
+      },
+      "displayName": "yewei0",
+      "rect": [
+        0,
+        0,
+        32,
+        32
+      ]
+    },
+    {
+      "type": "image",
+      "color": "rgb(255,0,0)",
+      "name": "symbols/QIF/alarm.json",
+      "visible": {
+        "func": "attr@blink.visible",
+        "value": false
+      },
+      "displayName": "alarm",
+      "rect": [
+        17.54208,
+        18.15814,
+        6.5,
+        6.5
+      ]
+    }
+  ]
+}

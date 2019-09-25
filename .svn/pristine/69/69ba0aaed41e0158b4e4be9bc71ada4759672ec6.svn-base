@@ -1,0 +1,473 @@
+<template>
+	<div class="SvgaddIndex">
+		<div class="org-tree-wrapper">
+			<div>
+				<search-tree :data="treeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索..."
+					><Icon type="ios-search" slot="suffix"
+				/></search-tree>
+			</div>
+		</div>
+
+		<div class="table-wrapper">
+			<searche-Header-Wrapper><Button type="success" size="large" icon="md-add" @click="addPage()">新增</Button></searche-Header-Wrapper>
+
+			<Table height="500" border :columns="columns" :data="data">
+				<template slot-scope="{ row }" slot="vcName">
+					<strong>{{ row.vcName }}</strong>
+				</template>
+				<template slot-scope="{ row }" slot="iTypeData">
+					<strong>{{ row.iTypeData }}</strong>
+				</template>
+				<template slot-scope="{ row }" slot="iSubTypeData">
+					<strong>{{ row.iSubTypeData }}</strong>
+				</template>
+				<template slot-scope="{ row, index }" slot="action">
+					<Button type="primary" icon="md-create" style="margin-right: 5px" @click="Editor(row, index)">编辑</Button>
+
+					<Button type="warning" icon="ios-create-outline" style="margin-right: 10px" @click="upData(row, index)">修改</Button>
+					<Button type="error" icon="md-trash" @click="remove(row, index)">删除</Button>
+				</template>
+			</Table>
+			<!-- 新增列表 -->
+			<Modal :title="modalTitle" v-model="changeAdd" :mask-closable="false" footer-hide @on-cancel="handleReset('formItem')">
+				<Form ref="formItem" :model="formItem" :label-width="100" :rules="ruleValidate">
+					<FormItem label="图纸类型:" prop="iPageType">
+						<RadioGroup v-model="formItem.iPageType">
+							<Radio label="2">2D</Radio>
+							<Radio label="3">3D</Radio>
+						</RadioGroup>
+					</FormItem>
+					<FormItem label="图纸主类型:" prop="iType">
+						<Select v-model="formItem.iType" placeholder="请选择">
+							<Option v-for="item in iTypeData" :key="item.dictID" :value="item.dictID + ''">{{ item.vcName }}</Option>
+						</Select>
+					</FormItem>
+					<FormItem label="图纸子类型:" prop="iSubType">
+						<Select v-model="formItem.iSubType" placeholder="请选择">
+							<Option v-for="item in iSubTypeData" :key="item.dictID" :value="item.dictID + ''">{{ item.vcName }}</Option>
+						</Select>
+					</FormItem>
+					<FormItem label="图纸名称:" prop="vcName"><Input v-model="formItem.vcName" placeholder/></FormItem>
+					<FormItem label="图纸上传:">
+						<Upload action :before-upload="handleUpload" :accept="accept" :format="Format"
+							><Button icon="ios-cloud-upload-outline">上传图纸</Button></Upload
+						>
+						<div v-if="file !== null" class="up-box">
+							待上传文件:
+							<span>
+								<div class="del" @click="removeFile">
+									<!-- <Icon type="md-trash" /> -->
+									<i class="el-icon-delete"></i>
+								</div>
+								{{ file.name }}
+							</span>
+						</div>
+					</FormItem>
+					<FormItem>
+						<Button type="primary" @click="handleSubmit('formItem', queryType)">确定</Button>
+						<Button style="margin-left: 8px" @click="handleReset('formItem')">取消</Button>
+					</FormItem>
+				</Form>
+			</Modal>
+			<!-- 编辑弹窗 -->
+			<Modal v-model="configModal" title="编辑图纸" fullscreen footer-hide>
+				<subConfig
+					v-if="configModal"
+					:url="subUrl"
+					:id="subId"
+					:pageId="subPageId"
+					:iPageType="subIPageType"
+					:propRow="subRow"
+					@subChange="subChange"
+				></subConfig>
+			</Modal>
+		</div>
+	</div>
+</template>
+<script>
+import subConfig from './sub-config-tree'
+export default {
+	name: 'SvgaddIndex',
+	data() {
+		return {
+			axios: this.$api.areaManage,
+			axiosFun: this.$api.stationManage,
+			changeAdd: false, // 对话框显隐
+			accept: '.json', // 上传格式
+			Format: ['.json'], // 上传格式
+			currentStation: null,
+			file: null,
+			listRest: false,
+			modalShow: false,
+			configModal: false,
+			treeData: [],
+			columns: [
+				{
+					title: '名称',
+					slot: 'vcName'
+				},
+				{
+					title: '图纸主类型',
+					slot: 'iTypeData'
+				},
+				{
+					title: '图纸子类型',
+					slot: 'iSubTypeData'
+				},
+				{
+					title: '操作',
+					slot: 'action',
+					width: 400
+				}
+			],
+			data: [],
+			iTypeData: [],
+			iSubTypeData: [],
+			formItem: {
+				vcName: '',
+				url: '',
+				unitId: '',
+				iPageType: '2',
+				iType: '',
+				iSubType: ''
+			},
+			ruleValidate: {
+				vcName: [{ required: true, message: '名称不能为空', trigger: 'blur' }],
+				iPageType: [{ required: true, message: '图纸类型必选', trigger: 'blur' }],
+				iType: [{ required: true, message: '图纸主类型不能为空', trigger: 'change' }],
+				iSubType: [{ required: true, message: '图纸子类型不能为空', trigger: 'change' }]
+			},
+			modalTitle: '新增基本信息',
+			isTree: true, // 判断有没有点击树
+			queryType: '',
+			updataPageId: '',
+			// 提示
+			toolTip: {
+				title: '',
+				type: '',
+				show: false
+			},
+			subUrl: '',
+			subId: '',
+			subPageId: '',
+			subIPageType: '',
+			subRow: {}
+		}
+	},
+	created() {
+		this.getStationTree()
+		this.findDic()
+	},
+	mounted() {
+		this.getList()
+	},
+	methods: {
+		// 获取树里面的第一个变电站
+		getFirstStation(data) {
+			let arr = []
+			function temp(source) {
+				for (let i = 0; i < source.length; i++) {
+					if (source[i].flag == 1) {
+						arr.push(source[i])
+					}
+					if (source[i].children.length > 0) {
+						temp(source[i].children)
+					}
+				}
+			}
+
+			temp(data)
+
+			arr.length && (this.formItem.unitId = arr[0].id)
+			this.modalShow = true
+			arr.length && this.$set(arr[0], 'selected', true)
+			this.getList()
+		},
+
+		// 上传
+		handleUpload(file) {
+			// 添加文件
+			this.file = file
+			this.step = 1
+			this.isFile = true
+			return false
+		},
+		// 移除文件
+		removeFile() {
+			this.file = null
+			this.step = 0
+			this.isFile = false
+		},
+		// 递归
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		// 获取站点树
+		async getStationTree() {
+			let result = await this.axios.getUnitTree({ iFlag: 2 })
+			if (result.code == 200) {
+				this._forEach(result.data, true, item => {
+					item.expand = true
+				})
+				if (result.data[0].flag == 0) {
+					this.formItem.unitId = ''
+					this.orgId = result.data[0].id
+				} else {
+					this.orgId = ''
+					this.formItem.unitId = result.data[0].id
+				}
+
+				this.treeData = result.data
+				this.getFirstStation(result.data)
+			}
+		},
+
+		subChange(subFlag) {
+			this.configModal = subFlag
+		},
+		addPage() {
+			this.formItem.iPageType = '2'
+			this.formItem.vcName = ''
+
+			if (this.modalShow) {
+				this.changeAdd = true
+				this.queryType = '新增'
+				this.modalTitle = '新增基本信息'
+			} else {
+				this.$Message.warning('请选择左侧变电站')
+			}
+		},
+		// 获取图纸信息
+		getList() {
+			this.$api.svgConfig.getSvgPaperInfo({ unitId: this.formItem.unitId }).then(res => {
+				if (res.code == 200) {
+					let data = res.data
+					if (this.iTypeData.length && this.iSubTypeData.length) {
+						data.map(item => {
+							let index = this.iTypeData.findIndex(val => val.dictID == item.iType)
+							if (index != -1) item.iTypeData = this.iTypeData[index].vcName
+
+							let i = this.iSubTypeData.findIndex(val => val.dictID == item.iSubType)
+							if (i != -1) item.iSubTypeData = this.iSubTypeData[i].vcName
+						})
+						this.data = data
+					}
+				}
+			})
+		},
+		Editor(row) {
+			if (row.vcUrl.length) {
+				this.subUrl = row.vcUrl
+				this.subId = row.unitId
+				this.subPageId = row.pageId
+				this.subIPageType = row.iPageType + ''
+				this.subRow = row
+				this.configModal = true
+			} else {
+				this.$Message.warning('请上传图纸！')
+			}
+		},
+		remove(rows, i) {
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除?',
+				onOk: () => {
+					const id = rows.pageId
+					this.$api.svgConfig.getSvgPaperDele(id).then(res => {
+						if (res.code == 200) {
+							this.$Message.info('删除成功')
+							this.getList()
+						} else {
+							this.$Message.error(res.msg)
+						}
+					})
+				},
+				onCancel: () => {}
+			})
+		},
+		upData(rows) {
+			this.modalTitle = '修改基本信息'
+			this.formItem.iPageType = rows.iPageType + ''
+			this.formItem.unitId = rows.unitId
+			this.formItem.vcName = rows.vcName
+			this.formItem.iType = rows.iType + ''
+			this.formItem.iSubType = rows.iSubType + ''
+			this.formItem.url = rows.vcUrl
+			this.queryType = '修改'
+			this.updataPageId = rows.pageId
+			this.changeAdd = true
+		},
+		handleSubmit(name, type) {
+			if (type == '新增') {
+				this.$refs[name].validate(valid => {
+					if (valid) {
+						// 保存图纸
+						let params = new FormData()
+						params.append('unitId', this.formItem.unitId)
+						params.append('vcName', this.formItem.vcName)
+						params.append('iPageType', this.formItem.iPageType)
+						params.append('file', this.file)
+						params.append('iType', this.formItem.iType)
+						params.append('iSubType', this.formItem.iSubType)
+						let config = {
+							header: { 'Content-Type': 'multipart/form-data' }
+						}
+
+						this.$api.svgConfig.getSvgPaperSave(params, config).then(res => {
+							if (res && res.code == 200) {
+								this.$Message.info('新增成功')
+								this.getList()
+							} else {
+								this.$Message.error(res.msg)
+							}
+						})
+						this.$refs[name].resetFields()
+						this.file = null
+						this.changeAdd = false
+					}
+				})
+			} else {
+				let params = new FormData()
+				params.append('unitId', this.formItem.unitId)
+				params.append('vcName', this.formItem.vcName)
+				params.append('iPageType', this.formItem.iPageType)
+				params.append('file', this.file)
+				params.append('iType', this.formItem.iType)
+				params.append('iSubType', this.formItem.iSubType)
+				params.append('pageId', this.updataPageId)
+				let config = {
+					header: { 'Content-Type': 'multipart/form-data' }
+				}
+
+				this.$api.svgConfig.getSvgPaperUpData(params, config).then(res => {
+					if (res.code == 200) {
+						this.getList()
+						this.$refs[name].resetFields()
+						this.changeAdd = false
+						this.file = null
+						this.$Message.info('修改成功')
+					} else {
+						this.$Message.error('修改失败')
+					}
+				})
+			}
+		},
+		handleReset(name) {
+			this.$refs[name].resetFields()
+			this.file = null
+			this.changeAdd = false
+		},
+		// 站点树点击事件
+		handleStationTree(data) {
+			if (data.length > 0) {
+				// 第一次点击
+				if (data[0].flag == 0) {
+					// 如果不是变电站
+					this.formItem.unitId = ''
+					// this.orgId = data[0].id
+					this.isTree = true // 新增不能点击
+					this.modalShow = false
+				} else {
+					// 是变电站
+					this.formItem.unitId = data[0].id
+					// this.orgId = ''
+					this.isTree = false
+					this.modalShow = true
+				}
+
+				this.stationName = data[0].title
+
+				this.getList()
+			} else {
+				this.isTree = true
+			}
+		},
+		// 查询字典组
+		findDic() {
+			this.axiosFun.findDicList({ dictGroupID: 1009 }).then(res => {
+				if (res.code == 200 && res.data) {
+					this.iTypeData = res.data
+				}
+			})
+			this.axiosFun.findDicList({ dictGroupID: 1010 }).then(res => {
+				if (res.code == 200 && res.data) {
+					this.iSubTypeData = res.data
+				}
+			})
+		}
+	},
+	components: {
+		subConfig
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.SvgaddIndex
+	width 100%
+	height calc(100vh - 140px)
+.org-tree-wrapper
+	width 230px
+	height calc(100vh - 145px)
+	background-color #fff
+	border 10px solid #fff
+	overflow auto
+	float left
+.table-wrapper
+	width calc(100% - 240px)
+	height 100%
+	float left
+	margin-left 10px
+	display flex
+	flex-direction column
+/deep/ .ivu-table th
+	text-align center
+/deep/ .ivu-table-cell
+	text-align center
+/deep/ .ivu-modal-content
+	background-color #fff !important
+.up-box
+	margin-left 10px
+	font-size 14px
+	color #515a6e
+	span
+		font-size 14px
+		color #464c5b
+		font-weight 600
+		display block
+		.del
+			float left
+			display inline-block
+			width 30px
+			text-align center
+			font-size 12px
+			line-height 100%
+			color #2b85e4
+			cursor pointer
+			margin-top 9px
+			&:hover
+				color #ed4014
+
+/deep/ .ivu-table-wrapper {
+	height: calc(100vh - 220px) !important;
+	.ivu-table-body,
+	.ivu-table-overflowY,
+	.ivu-table-tip,
+	.ivu-table-tip td {
+		height: calc(100vh - 260px) !important;
+	}
+}
+</style>

@@ -1,0 +1,507 @@
+<template>
+	<div class="org-manage" ref="org-manage">
+		<!-- 头 -->
+		<searche-header-wrapper>
+			<com-button size="large" type="add" @click="setModalConfig('orgModal', true, 'add', '新增组织')"></com-button>
+			<!-- <com-button type="delete"></com-button> -->
+		</searche-header-wrapper>
+		<!-- 表格 -->
+		<div class="org-manage-main">
+			<div>
+				<element-table
+					ref="org-tree-table"
+					:columns="columns"
+					height="500"
+					:data="tableData"
+					border
+					row-key="id"
+					default-expand-all
+					@on-edit="handlerEditRow"
+					@on-delete="handlerDeleteRow"
+					@row-click="row => handleTableRowClick('org-tree-table', row)"
+					:row-class-name="setRowClassName"
+				></element-table>
+			</div>
+		</div>
+		<!-- 弹框 -->
+		<Modal v-model="orgModal.show" :title="orgModal.title" :mask-closable="false">
+			<!-- 表单组件 -->
+			<com-form ref="org-info-form" v-model="orgInfoForm" :items="orgInfoFormItems">
+				<template #example>
+					<!-- <input  v-model="orgInfoForm.vcCode" placeholder="请输入..."> -->
+					<!-- <Input v-model="orgInfoForm.vcCode" placeholder="请输入..." /> -->
+					<p class="example">江苏省电力公司 00js、省检修分公司 00js.0sjx南京运维站 00js.0sjx.0njz、东善桥运维班 00js.0sjx.0njz.0dsq</p>
+				</template>
+				<template #axisFormItem>
+					<div class="axis-form-item">
+						<Input type="number" v-model="orgInfoForm.dMapx" placeholder="X 坐标" />
+						<Input type="number" v-model="orgInfoForm.dMapy" placeholder="Y 坐标" />
+						<div class="icon-wrapper">
+							<Icon type="md-pin" @click="showM = !showM" />
+						</div>
+					</div>
+				</template>
+			</com-form>
+
+			<modal-footer
+				slot="footer"
+				@on-cancel="setModalConfig('orgModal', false)"
+				@on-confirm="handlerModalConfirm(orgModal.type, 'org-info-form')"
+			></modal-footer>
+		</Modal>
+
+		<!-- 坐标拾取地图 -->
+		<map-modal :showM="showM" :isAdd="orgModal.type == 'add'" :mapXy="mapXy" @locations="locations"></map-modal>
+	</div>
+</template>
+<script>
+import elementTable from '_b/element-table'
+import mixinTolls from '@common/mixin/tools'
+import mapModal from '../station-manage/newMap'
+export default {
+	name: 'org-manage',
+	mixins: [mixinTolls],
+	components: {
+		elementTable,
+		mapModal
+	},
+	props: {},
+	data() {
+		// render 模块名称 + 图标
+
+		const renderIconName = (h, params) => {
+			// 0 市公司 1 运维班组 3 其他
+			let row = params.row
+			if (row.iType == 0) {
+				return h('span', [
+					h('Icon', {
+						props: {
+							type: 'md-cube'
+						},
+						style: {
+							margin: '0 5px 0',
+							display: 'inline-block',
+							color: '#ff9900'
+						}
+					}),
+					h('span', row.vcName)
+				])
+			} else if (row.iType == 1) {
+				return h('span', [
+					h('Icon', {
+						props: {
+							type: 'ios-disc'
+						},
+						style: {
+							margin: '0 5px 0',
+							display: 'inline-block',
+							color: '#ff9900'
+						}
+					}),
+					h('span', row.vcName)
+				])
+			} else {
+				return h('span', [
+					h('Icon', {
+						props: {
+							type: 'md-code'
+						},
+						style: {
+							margin: '0 5px 0',
+							display: 'inline-block',
+							color: '#ff9900'
+						}
+					}),
+					h('span', row.vcName)
+				])
+			}
+		}
+		return {
+			http: this.$api.orgManage,
+			enums: {},
+			parentTree: null,
+			orgModal: {
+				show: false,
+				type: '',
+				title: ''
+			},
+			addFlag: true,
+
+			// 添加 || 修改 组织
+			orgInfoForm: {
+				orgId: '',
+				vcName: '',
+				vcCode: '',
+				parentOrgId: '0',
+				iType: '1',
+				vcAddress: '',
+				dMapx: '',
+				dMapy: '',
+				vcMemo: '',
+				iSort: '0'
+			},
+			orgInfoFormItems: [
+				{
+					label: '父节点',
+					prop: 'parentOrgId',
+					type: 'tree-select',
+					options: [],
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+				},
+				{
+					label: '名称',
+					prop: 'vcName',
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }, { pattern: /^.{0,63}$/, message: '最多输入64字', trigger: 'change' }]
+				},
+				{ label: '编码', prop: 'vcCode', rules: [{ required: true, message: '该项为必填项', trigger: 'change' },{ pattern: /^.{0,63}$/, message: '最多输入64字', trigger: 'change' }] },
+				{ label: '示例', slot: 'example' },
+
+				{
+					label: '类型',
+					prop: 'iType',
+					type: 'select',
+					options: [],
+					setings: { value: 'id', label: 'value' },
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+				},
+				{ label: '排序', prop: 'iSort', rules: [{ pattern: /^[0-9]\d*$/, message: '请正确输入数字排序', trigger: 'change' }] },
+				{ label: '地址', prop: 'vcAddress', rules: [{ pattern: /^.{0,63}$/, message: '最多输入64字', trigger: 'change' }]  },
+				{ label: '坐标', prop: 'dMapx', slot: 'axisFormItem' },
+				{ label: '备注', prop: 'vcMemo', type: 'textarea', rules: [{ pattern: /^.{0,63}$/, message: '最多输入64字', trigger: 'change' }] }
+			],
+			// 坐标 模态
+			mapXy: {
+				dMapx: '',
+				dMapy: ''
+			},
+			showM: false,
+			isAdd: false,
+
+			// 表格
+			tableSelected: [],
+			columns: [
+				{ label: '名称', prop: 'vcName', align: 'left', width: 250, render: renderIconName },
+				{ label: '编码', prop: 'vcCode', width: 250 },
+				{ label: '类型', prop: 'orgType', width: 100 },
+				{ label: '地址', prop: 'vcAddress' },
+				{ label: '坐标X', prop: 'dMapx', width: 100 },
+				{ label: '坐标Y', prop: 'dMapy', width: 100 },
+				{ label: '排序', prop: 'iSort', width: 80 },
+				{ label: '备注', prop: 'vcMemo', width: 220 },
+				{ label: '操作', prop: 'action', width: 220, editShow: true, deleteShow: true }
+			],
+			tableData: []
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		'orgModal.show'(val) {
+			if (!val) {
+				this.addFlag = true
+				let obj = {
+					parentOrgId: '0',
+					iType: '1',
+					iSort: '0'
+				}
+				this.resetComForm(this['orgInfoForm'], obj, 'org-info-form')
+				this.orgInfoForm.iType = this.enums.orgType[0].id
+			} else {
+				if (this.orgModal.type == 'edit') {
+					this.setFormBySource(this.mapXy, this.orgInfoForm)
+				}
+			}
+		},
+		'orgInfoForm.parentOrgId'(val) {
+			// console.log(val)
+			if (this.addFlag) {
+				if (val != 0) {
+					this._forEach(this.parentTree, true, item => {
+						if (item.id == val) {
+							this.orgInfoForm.vcCode = item.vcCode
+						}
+					})
+				} else {
+					console.log(val)
+					this.orgInfoForm.vcCode = ''
+				}
+			}
+			this.addFlag = true
+		}
+		// orgInfoForm: {
+		// 	handler(newVal) {
+		// 		if (newVal.parentOrgId) {
+		// 			this._forEach(this.parentTree, true, item => {
+		// 				if (item.id == newVal.parentOrgId) {
+		// 					this.orgInfoForm.vcCode = item.vcCode
+		// 				}
+		// 			})
+		// 		}
+		// 	},
+		// 	deep: true
+		// }
+	},
+	created() {
+		this.init()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		// 初始化
+		init() {
+			this.getOrgDictData()
+		},
+		// 获取字典数据
+		getOrgDictData() {
+			let params = {
+				dictGroupID: 1007
+			}
+			this.http.getOrgDict(params).then(res => {
+				if (res.code == 200) {
+					this.enums['orgType'] = res.data.map(item => {
+						return {
+							id: String(item.dictID),
+							value: item.vcName
+						}
+					})
+
+					// 设置 待选类型数据
+					let targetIndex = this.getTargetIndexByKey(this.orgInfoFormItems, 'prop', 'iType')
+					this.orgInfoFormItems[targetIndex].options = this.enums.orgType
+
+					this.tableLoad()
+					this.orgInfoForm.iType = this.enums.orgType[0].id
+				}
+			})
+		},
+		// 表格加载
+		tableLoad() {
+			let params = {}
+			this.http.getOrgTreeData(params).then(res => {
+				if (res.code == '200') {
+					this.tableData = this.mapSourceToData(res.data)
+					// 设置 待选 父节点 数据
+					let targetIndex = this.getTargetIndexByKey(this.orgInfoFormItems, 'prop', 'parentOrgId')
+					this.orgInfoFormItems[targetIndex].options = [{ id: '0', title: '无', children: [] }, ...this.tableData]
+					this.parentTree = this.orgInfoFormItems[targetIndex].options
+				}
+			})
+		},
+		// 表格行的类名
+		setRowClassName(data) {
+			if (data.row.pid == '0') {
+				return 'rootNode'
+			}
+		},
+		// 表格多选
+		handleSelectionChange(val) {
+			this.tableSelected = val
+		},
+
+		// 表格修改某一行
+		handlerEditRow(row, index) {
+			this.addFlag = false
+			// this.setFormBySource(this.orgInfoForm, row)
+			console.log(row)
+			for (let k in row) {
+				this.orgInfoForm[k] = row[k]
+			}
+
+			this.setModalConfig('orgModal', true, 'edit', '编辑组织')
+		},
+
+		// 表格删除 某一行
+		handlerDeleteRow(row, index) {
+			this.$Modal.confirm({
+				title: '确认',
+				content: `<p>是否确认删除所选组织</p>`,
+				onOk: () => {
+					let params = {
+						orgId: row.orgId
+					}
+					this.http.deleteOrg(params).then(res => {
+						if (res.code == '200') {
+							this.$Message.success('删除成功')
+							this.tableLoad()
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+				}
+			})
+		},
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+
+		// 模态框确认
+		handlerModalConfirm(type, name) {
+			this.validateComForm(name, () => {
+				let params = this.orgInfoForm
+				params['iSort'] = Number(params['iSort'])
+				let requestType = ''
+				let text = ''
+				type == 'add' ? ((requestType = 'addOrg'), (text = '添加')) : ((requestType = 'editOrg'), (text = '修改'))
+				let noRepeat = true
+				if (type == 'add') {
+					this._forEach(this.tableData, true, item => {
+						if (item.vcName == this.orgInfoForm.vcName) {
+							noRepeat = false
+						}
+					})
+				}
+				if (noRepeat) {
+					this.http[requestType](params).then(res => {
+						if (res.code == '200') {
+							this.$Message.success(`${text}成功`)
+							this.tableLoad()
+							this.setModalConfig('orgModal', false)
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+				} else {
+					this.$Message.error('名称重复')
+				}
+			})
+		},
+		// 坐标拾取
+		locations(data) {
+			this.$set(this.orgInfoForm, 'dMapx', data.lng)
+			this.$set(this.orgInfoForm, 'dMapy', data.lat)
+		},
+
+		// components tolls -------------------------------------------------------------------------------------------------------
+		// 源数据映射为需要的数据
+		mapSourceToData(source) {
+			return source.map(item => {
+				item['dMapx'] = item['dMapx'] ? (item['dMapx'] - 0).toFixed(4) : ''
+				item['dMapy'] = item['dMapy'] ? (item['dMapy'] - 0).toFixed(4) : ''
+				item['expand'] = true
+
+				let orgTypeEnums = this.enums.orgType
+				item['orgType'] =
+					orgTypeEnums.findIndex(eItem => eItem.id == item['iType']) >= 0
+						? orgTypeEnums[orgTypeEnums.findIndex(eItem => eItem.id == item['iType'])].value
+						: ''
+
+				if (item.children.length == 0) {
+					return item
+				} else {
+					item['children'] = this.mapSourceToData(item.children)
+					return item
+				}
+			})
+		},
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.org-manage {
+  width: 100%;
+  height: 100%;
+
+  /deep/ .org-manage-main {
+    position: relative;
+    width: 100%;
+    height: calc(100% - 72px);
+    background-color: #fff;
+    border-top: 1px solid #dcdee2;
+
+    > div {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .element-table {
+      position: initial !important;
+
+      .el-table {
+        position: initial !important;
+        padding-top: 44px;
+        height: calc(100vh - 220px)!important;
+      }
+
+      .el-table__header-wrapper {
+        position: absolute;
+        top: 0;
+        z-index: 999;
+      }
+    }
+  }
+}
+
+.axis-form-item {
+  display: flex;
+
+  .icon-wrapper {
+    width: 80px;
+    height: 32px;
+    flex-align(center, center);
+    margin-left: 10px;
+
+    .ivu-icon {
+      font-size: 24px;
+      cursor: pointer;
+
+      &:hover {
+        color: #2d8cf0;
+      }
+    }
+  }
+
+  .ivu-input-wrapper {
+    &:first-of-type {
+      margin-right: 10px;
+    }
+  }
+}
+
+.example {
+  font-size: 14px;
+}
+</style>

@@ -1,0 +1,240 @@
+{
+  "modified": "Sat Aug 24 2019 14:30:03 GMT+0800 (中国标准时间)",
+  "dataBindings": [
+    {
+      "attr": "dev.name",
+      "valueType": "String",
+      "name": "相位"
+    },
+    {
+      "attr": "1002.0003",
+      "valueType": "String",
+      "name": "夹件电流"
+    },
+    {
+      "attr": "1002.0002",
+      "valueType": "String",
+      "name": "铁芯电流"
+    }
+  ],
+  "width": 500,
+  "height": 200,
+  "comps": [
+    {
+      "type": "rect",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "selectable": false,
+      "movable": false,
+      "editable": false,
+      "rect": [
+        9,
+        2.5,
+        482,
+        195
+      ]
+    },
+    {
+      "type": "shape",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "selectable": false,
+      "movable": false,
+      "editable": false,
+      "points": [
+        91.55884,
+        1.77784,
+        91.55884,
+        197.3542,
+        91.55884,
+        196.15461
+      ],
+      "segments": [
+        1,
+        2,
+        1
+      ]
+    },
+    {
+      "type": "shape",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "selectable": false,
+      "movable": false,
+      "editable": false,
+      "points": [
+        290.74291,
+        1.30671,
+        290.74291,
+        197.33059,
+        290.74291,
+        196.65981
+      ]
+    },
+    {
+      "type": "shape",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "selectable": false,
+      "movable": false,
+      "editable": false,
+      "points": [
+        91.09726,
+        149.3373,
+        488.80087,
+        149.3373
+      ]
+    },
+    {
+      "type": "image",
+      "name": "symbols/zf/clamp.png",
+      "displayName": "clamp",
+      "rect": [
+        150.48304,
+        17.75591,
+        82,
+        82
+      ]
+    },
+    {
+      "type": "image",
+      "name": "symbols/zf/electric.png",
+      "displayName": "electric",
+      "rect": [
+        352.38129,
+        18,
+        82,
+        82
+      ]
+    },
+    {
+      "type": "text",
+      "text": "夹件电流",
+      "color": "rgb(255,255,255)",
+      "font": "20px arial, sans-serif",
+      "rect": [
+        147.20555,
+        118.68191,
+        90.55498,
+        8.23227
+      ]
+    },
+    {
+      "type": "text",
+      "text": "铁芯电流",
+      "color": "rgb(255,255,255)",
+      "font": "20px arial, sans-serif",
+      "displayName": "铁芯电流",
+      "rect": [
+        350.82631,
+        118.68191,
+        90.55498,
+        8.23227
+      ]
+    },
+    {
+      "type": "text",
+      "text": "值（mA）",
+      "color": "rgb(255,255,255)",
+      "font": "20px arial, sans-serif",
+      "rect": [
+        105.20555,
+        169.78263,
+        90.55498,
+        8.23227
+      ]
+    },
+    {
+      "type": "text",
+      "text": "值（mA）",
+      "color": "rgb(255,255,255)",
+      "font": "20px arial, sans-serif",
+      "rect": [
+        304.69295,
+        169.78263,
+        90.55498,
+        8.23227
+      ]
+    },
+    {
+      "type": "roundRect",
+      "background": "#0F0D0E",
+      "borderColor": "#979797",
+      "cornerRadius": 3,
+      "rect": [
+        206.77518,
+        158.35252,
+        67.71043,
+        31.69424
+      ]
+    },
+    {
+      "type": "roundRect",
+      "background": "#0F0D0E",
+      "borderColor": "#979797",
+      "cornerRadius": 3,
+      "rect": [
+        409.52607,
+        158.05164,
+        67.71043,
+        31.69424
+      ]
+    },
+    {
+      "type": "text",
+      "text": {
+        "func": "attr@1002.0003",
+        "value": "00.00"
+      },
+      "align": "center",
+      "color": "#49FF01",
+      "font": "20px NSimSun",
+      "rect": [
+        206.77518,
+        158.35252,
+        67.71043,
+        31.69424
+      ]
+    },
+    {
+      "type": "text",
+      "text": {
+        "func": "attr@1002.0002",
+        "value": "00.00"
+      },
+      "align": "center",
+      "color": "#49FF01",
+      "font": "20px NSimSun",
+      "rect": [
+        409.52607,
+        158.05164,
+        67.71043,
+        31.69424
+      ]
+    },
+    {
+      "type": "image",
+      "name": "symbols/zf/history.png",
+      "displayName": "history",
+      "rect": [
+        240.6304,
+        6.40998,
+        46,
+        46
+      ],
+      "onClick": "__ht__function(event, data, view, point, width, height) {\nhtModel(data, '1002.0003')\n}"
+    },
+    {
+      "type": "image",
+      "name": "symbols/zf/history.png",
+      "displayName": "history",
+      "rect": [
+        441.80087,
+        6.40998,
+        46,
+        46
+      ],
+      "onClick": "__ht__function(event, data, view, point, width, height) {\nhtModel(data, '1002.0002')\n}"
+    }
+  ]
+}

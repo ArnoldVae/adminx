@@ -1,0 +1,722 @@
+<template>
+  <div class="protectCon">
+    <!-- 左侧树 -->
+    <div class="left-tree">
+      <search-tree :data="treeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索">
+        <Icon type="ios-search" slot="suffix"/>
+      </search-tree>
+    </div>
+    <!-- 防护区信息 -->
+    <div class="protectZone-info">
+      <div class="info-add">
+        <el-button @click="infoadd" type="success" size="small" icon="el-icon-plus">新增</el-button>
+      </div>
+      <div class="info-table">
+        <el-table :data="infoData" style="width: 100%" empty-text="暂无数据" height="650" border>
+          <el-table-column prop="vcName" label="防护区名称" align="center" width="180">
+            <template slot-scope="scope">
+              <span v-if="scope.row.rowShow" class="prarea">
+                <el-input size="mini" placeholder="请输入内容" v-model="protectInp" @focus="get($event)"></el-input>
+                <div class="protectareaList" v-if="pareaShow">
+                  <Menu width="auto" mode="vertical">
+                    <MenuItem
+                      :name="item.id"
+                      v-for="(item, index) in filterprotectareaList"
+                      :key="index"
+                    >
+                      <p @click="parelistClick(item)">{{ item.vcName }}</p>
+                    </MenuItem>
+                  </Menu>
+                </div>
+              </span>
+              <span v-else>{{ scope.row.vcName }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="contingency" label="应急预案" align="center" width="155">
+            <template slot-scope="scope">
+              <el-select
+                v-model="contingencyValue"
+                placeholder="请选择"
+                v-if="scope.row.rowShow"
+                no-data-text="无数据"
+              >
+                <el-option
+                  v-for="item in pareaOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                ></el-option>
+              </el-select>
+              <span v-else>{{ scope.row.contingency }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="intSort" label="排序" align="center" width="103">
+            <template slot-scope="scope">
+              <el-input size="small" v-model="sortName" placeholder="排序" v-if="scope.row.rowShow"></el-input>
+              <span v-else>{{ scope.row.intSort }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="action" label="操作" align="center" width="200">
+            <template slot-scope="scope">
+              <div v-if="scope.row.rowShow">
+                <el-button
+                  type="primary"
+                  size="small"
+                  icon="el-icon-check"
+                  @click="save(scope.row, scope.$index)"
+                >保存</el-button>
+                <el-button
+                  type="info"
+                  size="small"
+                  icon="el-icon-close"
+                  @click="scope.row.rowShow=false"
+                >取消</el-button>
+              </div>
+              <div v-else>
+                <el-button
+                  @click="Edit(scope.row,scope.$index)"
+                  type="warning"
+                  size="small"
+                  icon="el-icon-edit-outline"
+                >修改</el-button>
+                <el-button
+                  @click="Delete(scope.row, scope.$index)"
+                  type="danger"
+                  size="small"
+                  icon="el-icon-delete"
+                >删除</el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="info-pages">
+          <Page
+            @on-change="handleChangePage"
+            @on-page-size-change="handleChangePageSize"
+            :total="totals"
+            :current="curIndex"
+            :page-size="pageSize"
+            show-elevator
+            show-total
+            show-sizer
+          />
+        </div>
+      </div>
+    </div>
+    <!-- 防护区设备 -->
+    <div class="protectZone-equ">
+      <div class="equ-search">
+        <el-form :inline="true" :model="formInline" class="demo-form-inline">
+          <el-form-item label="设备名称">
+            <el-input v-model="formInline.equName" placeholder="请输入设备名称"></el-input>
+          </el-form-item>
+          <el-form-item label="设备类型">
+            <el-select v-model="formInline.equType" placeholder="请输入设备类型">
+              <el-option label="区域一" value="shanghai"></el-option>
+            </el-select>
+          </el-form-item>
+          <div class="equ-button">
+            <el-button type="primary" size="small" icon="el-icon-search" @click="onSubmit">查询</el-button>
+            <el-button @click="equadd" type="success" size="small" icon="el-icon-plus">新增</el-button>
+          </div>
+        </el-form>
+      </div>
+      <div class="equ-table">
+        <el-table :data="equData" style="width: 100%" empty-text="暂无数据" height="650" border>
+          <el-table-column prop="equmentName" label="设备名称" align="center" width="180">
+            <template slot-scope="scope">
+              <span v-if="scope.row.equrowShow">
+                <el-input size="mini" placeholder="请输入内容" v-model="equInp"></el-input>
+              </span>
+              <span v-else>{{ scope.row.equmentName }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="equmentType" label="设备类型" align="center" width="135">
+            <template slot-scope="scope">
+              <el-select
+                v-model="typeValue"
+                placeholder="请选择"
+                v-if="scope.row.equrowShow"
+                no-data-text="无数据"
+              >
+                <el-option
+                  v-for="item in equOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                ></el-option>
+              </el-select>
+              <span v-else>{{ scope.row.equmentType }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="longSortid" label="排序" align="center" width="60">
+            <template slot-scope="scope">
+              <el-input
+                size="small"
+                v-model="equsortName"
+                placeholder="请输入排序"
+                v-if="scope.row.equrowShow"
+              ></el-input>
+              <span v-else>{{ scope.row.longSortid }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="param1" label="参数1" align="center" width="60">
+            <template slot-scope="scope">
+              <el-input
+                size="small"
+                v-model="param1Name"
+                placeholder="请输入参数"
+                v-if="scope.row.equrowShow"
+              ></el-input>
+              <span v-else>{{ scope.row.param1 }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="param2" label="参数2" align="center" width="60">
+            <template slot-scope="scope">
+              <el-input
+                size="small"
+                v-model="param2Name"
+                placeholder="请输入参数"
+                v-if="scope.row.equrowShow"
+              ></el-input>
+              <span v-else>{{ scope.row.param2 }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="param3" label="参数3" align="center" width="60">
+            <template slot-scope="scope">
+              <el-input
+                size="small"
+                v-model="param3Name"
+                placeholder="请输入参数"
+                v-if="scope.row.equrowShow"
+              ></el-input>
+              <span v-else>{{ scope.row.param3 }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="action" label="操作" align="center" width="180">
+            <template slot-scope="scope">
+              <div v-if="scope.row.equrowShow">
+                <el-button
+                  type="primary"
+                  size="small"
+                  icon="el-icon-check"
+                  @click="equSave(scope.row, scope.$index)"
+                >保存</el-button>
+                <el-button
+                  type="info"
+                  size="small"
+                  icon="el-icon-close"
+                  @click="scope.row.equrowShow=false"
+                >取消</el-button>
+              </div>
+              <div v-else>
+                <el-button
+                  @click="equEdit(scope.row,scope.$index)"
+                  type="warning"
+                  size="small"
+                  icon="el-icon-edit-outline"
+                >修改</el-button>
+                <el-button
+                  @click="equDelete(scope, scope.$index)"
+                  type="danger"
+                  size="small"
+                  icon="el-icon-delete"
+                >删除</el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="equ-pages">
+          <Page
+            @on-change="handleChangePageEqu"
+            @on-page-size-change="handleChangePageSizeEqu"
+            :total="equtotals"
+            :current="equcurIndex"
+            :page-size="equpageSize"
+            show-elevator
+            show-total
+            show-sizer
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import pinyin from 'pinyin2'
+export default {
+	name: 'protect-zone',
+	components: {},
+	props: {},
+	data() {
+		return {
+			axios: this.$api.protectZone,
+			unitId: '',
+			treeData: [],
+			//防护区信息
+			infoData: [
+				// {
+				// 	vcName: '1号主变B相防护区',
+				// 	contingency: '预警',
+				// 	longSortid: '3'
+				// }
+			],
+			protectInp: '',
+			contingencyValue: '',
+			sortName: '',
+			pareaOptions: [],
+			pareaList: [],
+			// 防护区信息分页相关数据
+			curIndex: 1,
+			pageSize: 10,
+			totals: 0,
+			pareaShow: false,
+			protectAreaId: '',
+			//防护区设备
+			formInline: {
+				equName: '',
+				equType: ''
+			},
+			equData: [
+				// {
+				// 	equmentName: '1号主变B相防护区111',
+				// 	equmentType: '预警',
+				// 	longSortid: '2',
+				// 	param1: '22',
+				// 	param2: '22',
+				// 	param3: '22'
+				// }
+			],
+			equOptions: [],
+			equInp: '',
+			typeValue: '',
+			equsortName: '',
+			param1Name: '',
+			param2Name: '',
+			param3Name: '',
+			// 防护区设备分页相关数据
+			equcurIndex: 1,
+			equpageSize: 10,
+			equtotals:0
+		}
+	},
+
+	filters: {},
+	watch: {},
+	created() {
+		this.getStationTree()
+		this.getContingency()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		// 获取站点树
+		async getStationTree() {
+			let result = await this.axios.getUnitTree({ iFlag: 2 })
+			if (result.code == 200) {
+				let flgaNum = 1
+				this._forEach(result.data, true, item => {
+					item.expand = true
+					if (item.flag == flgaNum) {
+						this.unitId = item.id
+						// this.untidName = item.title
+						item.selected = true
+						flgaNum = 'a'
+					}
+				})
+				this.treeData = result.data
+				this.gettableList()
+				this.getareaList()
+			}
+		},
+		// 站点树点击事件
+		handleStationTree(data) {
+			this.unitId = data[0].id
+			this.getareaList()
+			this.gettableList()
+    },
+    //拼音
+		convertToPinyin() {
+			this.pareaList.forEach(
+				(item => {
+					const _pinyin = pinyin(item.vcName, {
+						style: pinyin.STYLE_NORMAL //全拼风格
+					})
+					item.pinyin = _pinyin.join('').toLowerCase()
+					item.py = _pinyin
+						.map(item => {
+							return item[0].substr(0, 1)
+						})
+						.join('')
+						.toLowerCase()
+				}).bind(this)
+			)
+			// console.log(this.nodeListsearch);
+		},
+		//防护区信息
+		//信息table
+		gettableList() {
+			this.axios
+				.gettableList({
+					currentPage: this.curIndex,
+					pageSize: this.pageSize,
+					unitId: this.unitId
+				})
+				.then(res => {
+					if (res.code == 200) {
+						this.totals = res.data.page.totalNum
+						if (res.data.lists) {
+							res.data.lists.forEach(item => {
+                item['rowShow'] = false
+                if(item.fireRpInfoDtoList&&item.fireRpInfoDtoList[0].vcName){
+							  	item['contingency'] = item.fireRpInfoDtoList[0].vcName
+                }
+							
+							})
+							this.infoData = res.data.lists
+						}
+					}
+				})
+		},
+		//区域列表
+		getareaList() {
+			this.axios
+				.getareaList({
+					unitId: this.unitId
+				})
+				.then(res => {
+					if (res.code == 200) {
+						this.pareaList = []
+						if (res.data.length == 0) {
+							this.pareaList.push({
+								id: 0,
+								vcName: '暂无数据'
+							})
+						} else {
+							res.data.forEach(item => {
+								this.pareaList.push({
+									vcName: item.vcName,
+									id: item.protectAreaId,
+									protectAreaId: item.protectAreaId
+								})
+							})
+						}
+						this.convertToPinyin()
+					}
+				})
+		},
+		//应急预案
+		getContingency() {
+			this.axios
+				.getContingency({
+					page: {
+						pageSize: 1000,
+						pageNum: 1
+					}
+				})
+				.then(res => {
+					if (res.code == 200) {
+						let arr = res.data.pagedModelList
+						let Newararry = []
+						arr.forEach(item => {
+							// if (!Newararry.includes(item.vcName)) {
+							// 	Newararry.push(item.vcName)
+              // }
+              this.pareaOptions.push({
+								label: item.vcName,
+								value: item.frpid
+							})
+						})
+						// Newararry.forEach(its => {
+						// 	this.pareaOptions.push({
+						// 		label: its,
+						// 		value: its
+						// 	})
+						// })
+					}
+				})
+		},
+		//点击防护区列表
+		parelistClick(val) {
+			if (val) {
+        this.protectInp = val.vcName
+				this.protectAreaId = val.protectAreaId
+        this.pareaShow = false
+        this.contingencyValue=''
+        this.sortName=''
+        
+			}
+		},
+		get(ev) {
+			if (ev.type == 'focus') {
+				this.pareaShow = true
+			}
+		},
+		//新增
+		infoadd() {
+			if (this.unitId == '') {
+        	this.$message({
+							message: '请选择左侧变电站!!!',
+							type: 'warning'
+						})
+			} else {
+				this.pareaShow = false
+				this.protectInp = ''
+				this.sortName = ''
+				this.contingencyValue = ''
+				this.infoData.push({
+					vcName: '',
+					contingency: '',
+					intSort: '',
+					rowShow: true
+				})
+			}
+		},
+		//保存
+		save(row, index) {
+      this.pareaShow = false
+			this.axios
+				.getprareinfoSave({
+          id:row.id,
+					unitId: this.unitId,
+          vcName: this.protectInp,
+          frpid:this.contingencyValue,
+					protectAreaId: this.protectAreaId || row.protectAreaId,
+          sort: this.sortName
+				})
+				.then(res => {
+					if (res.code == 200) {
+						this.$message({
+							message: '保存成功!!!',
+							type: 'success'
+            })
+             this.pareaOptions.forEach(item=>{
+              if(this.contingencyValue==item.value){
+                this.contingencyValue=item.label
+              }
+            })
+            this.infoData[index].rowShow = false
+            this.infoData[index].vcName = this.protectInp
+            this.infoData[index].intSort = this.sortName
+            this.infoData[index].contingency = this.contingencyValue
+					}
+				})
+		},
+		//删除
+		Delete(rows, index) {
+      this.axios.deleData({
+        id:rows.id
+      }).then(res=>{
+        if(res.code==200){
+          if (res.code == 200) {
+             this.infoData.splice(index, 1)
+						this.$message({
+							message: '删除成功!!!',
+							type: 'success'
+						})
+					}
+        }
+      })
+		},
+		//修改
+		Edit(rows, index) {
+      this.infoData.forEach((items,idx)=>{
+        if(items.rowShow && items.id !=rows.id){
+          this.infoData[idx].rowShow=false
+        }
+      })
+			this.pareaShow = false
+			this.infoData[index].rowShow = true
+			this.protectInp = rows.vcName
+			this.contingencyValue = rows.contingency
+      this.sortName = rows.intSort
+      this.pareaOptions.forEach(item=>{
+        if(this.contingencyValue==item.label){
+          this.contingencyValue=item.value
+        }
+      })
+		},
+		//分页
+		handleChangePage(val) {
+			this.curIndex = val
+			this.gettableList()
+		},
+		handleChangePageSize(val) {
+			this.pageSize = val
+			this.gettableList()
+		},
+		//防护区-设备
+		//查询
+		onSubmit() {},
+		//新增
+		equadd() {},
+		//保存
+		equEdit(rows, index) {},
+		equSave(rows, index) {},
+		//删除
+		equDelete(rows, index) {},
+		//防护设备分页
+		handleChangePageEqu() {},
+		handleChangePageSizeEqu() {}
+	},
+	computed: {
+		filterprotectareaList() {
+			let result = []
+			return (result = this.pareaList.filter(item => {
+				if (this.protectInp == '') {
+					return true
+				} else if (/^[\u4e00-\u9fa5]+$/gi.test(this.protectInp) && item.vcName.includes(this.protectInp) && this.protectInp != '') {
+					item.vcName.match(this.protectInp)
+					return true
+				} else if (escape(this.protectInp).indexOf('%u') < 0 && item.py.includes(this.protectInp.toLowerCase()) && this.protectInp != '') {
+					item.vcName.match(this.vcName)
+					return true
+				}
+			}))
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.protectCon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+
+  .left-tree {
+    width: 230px;
+    height: calc(100vh - 140px);
+    background-color: #fff;
+    border: 1px solid #fff;
+    overflow: auto;
+    margin-right: 10px;
+  }
+
+  .protectZone-info {
+    width: 650px;
+    height: calc(100vh - 140px);
+    background-color: #fff;
+    border: 1px solid #fff;
+    overflow: auto;
+    margin-right: 10px;
+
+    .info-add {
+      width: 100%;
+      height: 40px;
+      line-height: 40px;
+
+      .el-button {
+        margin-left: 10px;
+      }
+    }
+
+    .info-table {
+      width: 100%;
+      height: calc(100% - 40px);
+      /deep/ .el-table th{
+         background-color: #f8f8f9;
+      }
+      .prarea {
+        .protectareaList {
+          position: absolute;
+          left: 0;
+          top: 46px;
+          background-color: #fff;
+          width: 183px;
+          height: 200px;
+          overflow: auto;
+          // border: 1px solid #eee;
+
+          .ivu-menu .ivu-menu-item {
+            text-align: left;
+            margin-left: 8px;
+            padding: 0;
+          }
+        }
+      }
+    }
+
+    .info-pages {
+      width: 100%;
+      height: calc(100% - 650px);
+      text-align: center;
+      overflow: auto;
+
+      /deep/ .ivu-page {
+        margin-top: 10px;
+      }
+    }
+  }
+
+  .protectZone-equ {
+    width: calc(100% - 880px);
+    height: calc(100vh - 140px);
+    background-color: #fff;
+    border: 1px solid #fff;
+    overflow: auto;
+
+    .equ-search {
+      width: 100%;
+      height: 40px;
+      position: relative;
+
+      .equ-button {
+        position: absolute;
+        top: 5px;
+        right: 0;
+      }
+
+      /deep/ .el-input__inner {
+        height: 32px !important;
+        line-height: 32px;
+      }
+    }
+
+    .equ-table {
+      width: 100%;
+      height: calc(100% - 40px);
+      /deep/ .el-table th{
+        background-color: #f8f8f9;
+      }
+      .equ-pages {
+        width: 100%;
+        height: calc(100% - 650px);
+        text-align: center;
+        overflow: auto;
+
+        /deep/ .ivu-page {
+          margin-top: 10px;
+        }
+      }
+    }
+  }
+}
+</style>

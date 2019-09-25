@@ -1,0 +1,1202 @@
+<template>
+	<div class="business-tree" ref="business-tree">
+		<div class="org-tree-wrapper">
+			<div>
+				<search-tree ref="bus-org-search-tree" :data="orgTreeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索...">
+					<Icon type="ios-search" slot="suffix" />
+				</search-tree>
+			</div>
+		</div>
+		<div class="table-wrapper">
+			<!-- 头 -->
+			<searche-header-wrapper>
+				<com-button type="add" size="large" style="margin-right: 40px;" @click="handleAddBusTree('add')" :disabled="!isStation">新增</com-button>
+
+				<com-button type="confirm" icon="ios-cloud-download-outline" size="large" @click="handleAddBusTree('import')" :disabled="!isStation"
+					>导入设备</com-button
+				>
+			</searche-header-wrapper>
+			<!-- 表格 -->
+			<div class="business-tree-main">
+				<div>
+					<element-table
+						ref="bus-tree-table"
+						:columns="columns"
+						:data="tableData"
+						border
+						row-key="bindId"
+						default-expand-all
+						highlight-current-row
+						@on-edit="handlerEditRow"
+						@on-delete="handlerDeleteRow"
+						@current-change="handleTableRowChange"
+						@row-click="row => handleTableRowClick('bus-tree-table', row)"
+						:row-class-name="setRowClassName"
+					></element-table>
+				</div>
+			</div>
+		</div>
+
+		<!-- 弹框 -->
+		<Modal v-model="busModal.show" :title="busModal.title" :mask-closable="false" :width="modalWidth">
+			<!-- 模态框 自定义 步骤条 -->
+			<div slot="header">
+				<Steps :current="stepsConfig.current" v-if="busModal.type != 'edit-bus-tree'">
+					<Step v-for="item in stepsConfig.list" :key="item.title" :title="item.title" :content="item.content"></Step>
+				</Steps>
+
+				<p v-else>{{ busModal.title }}</p>
+			</div>
+
+			<!-- 表单组件 -->
+			<div v-show="busModal.type == 'add-bus-tree'">
+				<com-form :ref="formName" v-model="busInfoForm" :items="busInfoFormItems">
+					<template #test>
+						<p style="font-size: 0.63222rem; margin-top: 0.05rem;">室内1000，室外2000</p>
+					</template>
+				</com-form>
+			</div>
+
+			<!-- 添加 区域表单 组件 -->
+			<div v-show="busModal.type == 'add-area'">
+				<add-area-form
+					:dataObj="currentStation ? { name: currentStation.title, id: currentStation.id } : {}"
+					:modalShow="busModal.show"
+					:isSubmit="saveArea"
+					:isCodeShow="addCodeShow"
+					:dataProps="busInfoForm"
+					@update-save="handleSaveArea"
+				></add-area-form>
+			</div>
+
+			<!-- 添加 相位 表单 -->
+			<div v-show="busModal.type == 'add-phase-position'">
+				<com-form ref="phase-position-form" v-model="busInfoForm" :items="phasePositionFormItems"></com-form>
+			</div>
+
+			<!-- 添加设备 -->
+			<div class="add-dev-wrapper" v-show="busModal.type == 'add-dev'">
+				<!-- <h1>添加设备</h1> -->
+				<add-dev-comp @add-dev-update="addDevUpdate" @handleBack="handleCancel"></add-dev-comp>
+			</div>
+
+			<!-- 导入 区域 || 设备 -->
+			<div class="import-tree-wrapper" v-show="busModal.type == 'import-dev'">
+				<div class="subs-tree-wrapper">
+					<div>
+						<search-tree ref="search-tree" :data="devTreeData" placeholder="输入关键词搜索..." @on-select-change="handleDSubs">
+							<Icon type="ios-search" slot="suffix" />
+						</search-tree>
+					</div>
+				</div>
+
+				<div class="dev-list-wrapper">
+					<searche-header-wrapper>
+						<form-item
+							title="设备名称"
+							type="text"
+							v-model="devListParams.vcName"
+							placeholder="输入场景名称搜索"
+							:clearable="true"
+							noMBottom
+						></form-item>
+
+						<com-button type="search" @click="devListLoad"></com-button>
+					</searche-header-wrapper>
+
+					<div class="dev-list">
+						<el-tree
+							ref="import-tree"
+							node-key="id"
+							:data="devListData"
+							:props="{ label: 'vcName' }"
+							empty-text="暂无数据"
+							check-strictly
+							check-on-click-node
+							show-checkbox
+						></el-tree>
+					</div>
+				</div>
+			</div>
+
+			<!-- 修改业务树 -->
+			<div v-show="busModal.type == 'edit-bus-tree'">
+				<com-form ref="phase-position-form" v-model="busInfoForm" :items="editBusTreeFormItems"></com-form>
+			</div>
+
+			<!-- 底部 按钮 -->
+			<div slot="footer">
+				<com-button type="cancel" @click="busModal.set(false)"></com-button>
+
+				<com-button type="confirm" v-if="!isAreaOrDev && busModal.type != 'edit-bus-tree'" @click="prevStep">上一步</com-button>
+
+				<com-button v-if="!isAreaOrDev" type="confirm" @click="handlerModalConfirm(busModal.type)">确定</com-button>
+
+				<com-button type="confirm" v-if="isAreaOrDev && busModal.type != 'edit-bus-tree'" @click="nextStep(busModal.type)">下一步</com-button>
+			</div>
+		</Modal>
+	</div>
+</template>
+<script>
+import { ModalConfig } from '@/libs/construction'
+import elementTable from '_b/element-table'
+import mixinTolls from '@common/mixin/tools'
+import { findComponentUpward, findComponentDownward } from '@/libs/assist'
+
+import addAreaForm from '../areas-manage/area-manage/sub-area' // 添加区域的表单组件
+import addDevComp from '../device-manage/device-modeling/add-ac-and-edit' // 添加设备的组件
+import { close } from 'fs'
+
+export default {
+	name: 'business-tree',
+	mixins: [mixinTolls],
+	components: {
+		elementTable,
+		addAreaForm,
+		addDevComp
+	},
+	props: {},
+	data() {
+		// render 模块名称 + 图标
+		const renderIconName = (h, params) => {
+			let row = params.row
+
+			if (row.iBindType == 1) {
+				return h('span', [
+					h('i', {
+						class: {
+							'el-icon-folder-opened': true
+						},
+						style: {
+							margin: '0 5px 0',
+							display: 'inline-block',
+							fontSize: '16px',
+							color: '#ff9900'
+						}
+					}),
+					h('span', row.vcName)
+				])
+			} else if (row.iBindType == 2) {
+				return h('span', [
+					h('i', {
+						class: {
+							'el-icon-collection-tag': true
+						},
+						style: {
+							margin: '0 5px 0',
+							display: 'inline-block',
+							fontSize: '16px',
+							color: '#ff9900'
+						}
+					}),
+					h('span', row.vcName)
+				])
+			} else if (row.iBindType == 3) {
+				return h('span', [
+					h('i', {
+						class: {
+							'el-icon-notebook-2': true
+						},
+						style: {
+							margin: '0 5px 0',
+							display: 'inline-block',
+							fontSize: '16px',
+							color: '#ff9900'
+						}
+					}),
+					h('span', row.vcName)
+				])
+			}
+		}
+
+		return {
+			http: this.$api.businessTree,
+			areaHttp: this.$api.areaManage,
+			enums: null,
+
+			busModal: new ModalConfig(),
+			// 左侧树 数据
+			orgTreeData: [],
+
+			// 导入 or 新建
+			filterText: '',
+			saveArea: false,
+
+			devTreeData: [],
+			devListData: [],
+			devListParams: {
+				vcName: ''
+			},
+
+			stepsConfig: {
+				current: 0,
+				list: []
+			},
+
+			// 添加 || 修改 组织
+			formName: Symbol('org-info-form'),
+			busInfoForm: {
+				treeId: '',
+				vcName: '',
+				parentId: '0',
+				unitId: '',
+				iBindType: '',
+				bindId: '',
+				vcCode: ''
+			},
+			addCodeShow: false,
+			busInfoFormItems: [
+				{
+					label: '父节点',
+					prop: 'parentId',
+					type: 'tree-select',
+					options: [],
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+				},
+				{
+					label: '类型',
+					prop: 'iBindType',
+					type: 'radio',
+					options: [],
+					setings: { value: 'id', label: 'value' },
+					rules: [{ required: true, message: '请选择必要的类型', trigger: 'change' }],
+					disabled: false
+				},
+				{
+					label: '编码',
+					prop: 'vcCode',
+					type: 'text',
+					options: [],
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+				},
+				{
+					label: '示例',
+					slot: 'test'
+				}
+			],
+			// 添加相位的 表单数据
+			phasePositionFormItems: [
+				{
+					label: '名称',
+					prop: 'vcName',
+					type: 'radio',
+					options: [],
+					rules: [{ required: true, message: '请选择必要的名称', trigger: 'change' }]
+				}
+			],
+
+			// 修改 业务树的表单
+			editBusTreeFormItems: [
+				{
+					label: '名称',
+					prop: 'vcName',
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+				},
+				{
+					label: '父节点',
+					prop: 'parentId',
+					type: 'tree-select',
+					options: [],
+					rules: [{ required: true, message: '该项为必填项', trigger: 'change' }],
+					disabled: true
+				},
+				// {
+				// 	label: '编码',
+				// 	prop: 'vcCode',
+				// 	type: 'text',
+				// 	options: [],
+				// 	rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+				// },
+				{
+					label: '类型',
+					prop: 'iBindType',
+					type: 'radio',
+					options: [],
+					setings: { value: 'id', label: 'value' },
+					rules: [{ required: true, message: '请选择必要的类型', trigger: 'change' }],
+					disabled: true
+				}
+			],
+
+			// 表格
+			columns: [
+				{ label: '名称', prop: 'vcName', align: 'left', render: renderIconName },
+				{ label: '绑定类型', prop: 'iBindTypeHtml' },
+				{ label: '编码', prop: 'vcCode' },
+				// { label: '备注', prop: 'vcMemo' },
+				{ label: '操作', prop: 'action', width: 220, editShow: true, deleteShow: true }
+			],
+			tableData: [],
+			addFlag: true,
+
+			// 当前活动的数据
+			currentStation: null, // 活动的 站点
+			currentArea: null, // 活动的区域
+			currentRow: null, // 表格活动行
+			currentParentType: '', // 活动的上一步的类型
+			currentSubSystem: null, // 活动的子系统
+			currentType: null,
+			prevHaveDataTreeNode: null
+		}
+	},
+	computed: {
+		isAreaOrDev() {
+			let modalType = this.busModal.type
+			if (modalType == 'add-bus-tree') return true
+			else return false
+		},
+		isStation() {
+			if (this.currentStation) return true
+			else return false
+		},
+		modalWidth() {
+			let type = this.busModal.type
+			let width = ''
+			if (type == 'add-dev') width = 1400
+			else if (type == 'import-dev') width = 800
+			else width = 600
+			return width
+		}
+	},
+	filters: {},
+	watch: {
+		currentStation(val) {
+			if (val) {
+				this.addFlag = true
+				this.tableLoad()
+			} else {
+				this.tableData = []
+			}
+		},
+		'busModal.show'(val) {
+			if (!val) {
+				this.initAtModalClose()
+			} else {
+				// 弹框展示
+			}
+		},
+		'busModal.type'(newVal) {
+			if (newVal == 'import-dev') {
+				this.getSubSystemTreeData()
+				this.devListLoad()
+			}
+		},
+		filterText(newVal) {
+			this.$refs['import-tree'].filter(newVal)
+		},
+		'busInfoForm.parentId'(newVal) {
+			// console.log(newVal)
+			if (this.addFlag) {
+				let arr = this._forEach(this.tableData)
+				let val = arr.findIndex(item => item.id == newVal)
+				if (val !== -1) {
+					// this.busInfoForm.vcCode = arr[val].vcCode
+				} else {
+					this.busInfoForm.vcCode = ''
+				}
+			}
+			this.addFlag = true
+
+			if (newVal == 0) {
+				if (this.busInfoFormItems.findIndex(item => item.label == '编码') == -1) {
+					this.busInfoFormItems.push({
+						label: '编码',
+						prop: 'vcCode',
+						type: 'text',
+						options: [],
+						rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+					})
+					this.busInfoFormItems.push({
+						label: '示例',
+						slot: 'test'
+					})
+				}
+			} else {
+				if (this.busInfoFormItems.findIndex(item => item.label == '编码') >= 0) {
+					this.busInfoFormItems.splice(2, 1)
+					this.busInfoFormItems.splice(2, 1)
+				}
+			}
+		}
+	},
+	created() {
+		this.init()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		// 简单的树映射
+		_forEach(dataVal) {
+			let arr = []
+			function fun(val) {
+				for (let i = 0; i < val.length; i++) {
+					arr.push({ id: val[i].id, vcCode: val[i].vcCode })
+					if (val[i].children) {
+						fun(val[i].children)
+					}
+				}
+			}
+			fun(dataVal)
+			// console.log(arr);
+			return arr
+		},
+		// 初始化
+		init() {
+			// 获取本地 定义的枚举 数据
+			this.$api.getLocalData('enums.json').then(res => {
+				this.enums = res.data
+				// 设置 待选类型数据
+				let addIBindTypeIndex = this.getTargetIndexByKey(this.busInfoFormItems, 'prop', 'iBindType')
+				let editIBindTypeIndex = this.getTargetIndexByKey(this.editBusTreeFormItems, 'prop', 'iBindType')
+				this.busInfoFormItems[addIBindTypeIndex].options = this.enums.businessTreeNodeList
+				this.editBusTreeFormItems[editIBindTypeIndex].options = this.enums.businessTreeNodeList
+
+				// 设置 待选 相位名称数据
+				let phasePositionIndex = this.getTargetIndexByKey(this.phasePositionFormItems, 'prop', 'vcName')
+				this.phasePositionFormItems[phasePositionIndex].options = this.enums.phasePositionList
+
+				// 获取组织树
+				this.getOrgTreeData()
+
+				// 表格加载
+				// this.tableLoad()
+			})
+		},
+		// 组织树加载
+		getOrgTreeData() {
+			this.areaHttp.getUnitTree({ iFlag: 2 }).then(res => {
+				if (res.code == 200) {
+					this.orgTreeData = this.mapSourceToData(res.data)
+
+					this.getFirstStation(this.orgTreeData)
+				}
+			})
+		},
+
+		// 表格加载
+		tableLoad() {
+			let params = {}
+			if (this.currentStation) params['unitId'] = this.currentStation.id // 根据活动 的 stationID 获取表格
+
+			this.http.getBusinessTree(params).then(res => {
+				if (res.code == 200) {
+					this.tableData = this.mapSourceToData(res.data, 'table')
+					console.log(this.tableData)
+					// 设置表单的 父节点字段 待选 业务
+					let options = [
+						{ id: '0', title: '无', children: [] },
+						...res.data.map(item => {
+							item['expand'] = true
+							return item
+						})
+					]
+
+					let addParentIdIndex = this.getTargetIndexByKey(this.busInfoFormItems, 'prop', 'parentId')
+					let editParentIdIndex = this.getTargetIndexByKey(this.editBusTreeFormItems, 'prop', 'parentId')
+
+					this.busInfoFormItems[addParentIdIndex].options = options
+					this.editBusTreeFormItems[editParentIdIndex].options = options
+				}
+			})
+		},
+		// 表格行的类名
+		setRowClassName(data) {
+			if (data.row.pid == 0) {
+				return 'rootNode'
+			}
+		},
+
+		// 树点击
+		handleStationTree(node) {
+			// 清空 已选的 表格 row
+			this.$nextTick(() => {
+				this.$refs['bus-tree-table'].$children[0].setCurrentRow()
+			})
+
+			if (!this.prevHaveDataTreeNode) {
+				this.currentStation && (this.currentStation.id && (this.prevHaveDataTreeNode = this.getNodeById(this.orgTreeData, this.currentStation.id)))
+			}
+
+			if (!node.length) {
+				this.currentStation = null
+				this.$refs['bus-org-search-tree'].$refs.tree.handleSelect(this.prevHaveDataTreeNode.nodeKey)
+				return
+			} else {
+				this.prevHaveDataTreeNode = node[0]
+			}
+
+			if (node[0].flag == 1) {
+				this.currentStation = node[0]
+			} else this.currentStation = null
+		},
+
+		// 表格某一行 单选状态发生变化
+		handleTableRowChange(currentRow, oldCurrentRow) {
+			if (!currentRow) return
+
+			this.currentRow = currentRow
+			this.getStationNodeByUnitId(this.orgTreeData, currentRow.unitId)
+		},
+
+		// 表格修改某一行
+		handlerEditRow(row, index) {
+			this.addFlag = false
+			this.setFormBySource(this.busInfoForm, row)
+			this.busModal.set(true, 'edit-bus-tree', '编辑组织树')
+		},
+
+		// 表格删除 某一行 数据
+		handlerDeleteRow(row, index) {
+			this.$Modal.confirm({
+				title: '确认',
+				content: `<p>是否确认删除所选组织</p>`,
+				onOk: () => {
+					this.http.deleteBusTree(row.treeId).then(res => {
+						if (res.code == '200') {
+							this.$Message.success('删除成功')
+							this.tableLoad()
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+				}
+			})
+		},
+
+		// 点击新增
+		handleAddBusTree(type) {
+			// 设置步骤条 信息
+			let stepList = ''
+
+			if (type == 'add') {
+				stepList = [{ title: '步骤1', content: '选择业务树信息' }, { title: '步骤2', content: '完善信息' }]
+				console.log(this.busInfoFormItems[0].options)
+				if (!this.busInfoFormItems[0].options.length || this.busInfoFormItems[0].options[0].id != 0) {
+					let optios = [{ id: '0', title: '无', children: [] }, ...this.busInfoFormItems[0].options]
+					this.busInfoFormItems[0].options = optios
+				}
+
+				if (this.busInfoFormItems.findIndex(item => item.label == '编码') == -1) {
+					this.busInfoFormItems.push({
+						label: '编码',
+						prop: 'vcCode',
+						type: 'text',
+						options: [],
+						rules: [{ required: true, message: '该项为必填项', trigger: 'change' }]
+					})
+					this.busInfoFormItems.push({
+						label: '示例',
+						slot: 'test'
+					})
+				}
+			} else if (type == 'import') {
+				if (this.busInfoFormItems[0].options[0].id == 0) {
+					this.busInfoFormItems[0].options.splice(0, 1)
+				}
+				stepList = [{ title: '步骤1', content: '选择业务树父节点' }, { title: '步骤2', content: '选择设备导入' }]
+
+				// 如果是导入设备 指定类型 为 设备 并禁用
+				this.busInfoForm['iBindType'] = '2'
+
+				let index = this.getTargetIndexByKey(this.busInfoFormItems, 'prop', 'iBindType')
+				this.busInfoFormItems[index].disabled = true
+
+				// { id: '0', title: '无', children: [] }  options
+				this.busInfoFormItems[index]
+
+				if (this.busInfoFormItems.findIndex(item => item.label == '编码') >= 0) {
+					this.busInfoFormItems.splice(2, 1)
+					this.busInfoFormItems.splice(2, 1)
+				}
+			}
+
+			this.$set(this.stepsConfig, 'list', stepList)
+			// 如果已选表格 row 将当前选中的 row 的数据带入 treeId
+			if (this.currentRow) this.busInfoForm['parentId'] = this.currentRow.treeId
+
+			this.busModal.set(true, 'add-bus-tree', '新增区域')
+		},
+
+		// 下一步
+		nextStep(type) {
+			this.validateComForm(this.formName, () => {
+				this.currentParentType = type // 设置当前上一步
+				let { iBindType } = this.busInfoForm
+				let nextFlag = true
+				let arr = this._forEach(this.tableData)
+				// arr.forEach(item => {
+				// 	if (item.vcCode == this.busInfoForm.vcCode) {
+				// 		nextFlag = false
+				// 	}
+				// })
+
+				if (nextFlag) {
+					switch (iBindType) {
+						case '1':
+							this.busModal.set(true, 'add-area', '')
+							break
+						case '2': {
+							let index = this.getTargetIndexByKey(this.busInfoFormItems, 'prop', 'iBindType')
+							let isImportDev = this.busInfoFormItems[index].disabled // 如果选择类型的 radio 处于禁用状态 说明属于 导入设备
+							if (isImportDev) {
+								this.busModal.set(true, 'import-dev', '')
+							} else {
+								this.busModal.set(true, 'add-dev', '')
+								this.handleAddACDeviceModal()
+							}
+							break
+						}
+						case '3':
+							this.busModal.set(true, 'add-phase-position', '')
+							break
+					}
+
+					this.$set(this.stepsConfig, 'current', 1)
+				} else {
+					// this.$Message.warning('编码不能重复')
+				}
+			})
+		},
+
+		// 上一步
+		prevStep() {
+			this.busModal.set(true, this.currentParentType, ` `) // 切换 表单内容类型 到 表单提交
+			this.$set(this.stepsConfig, 'current', 0)
+		},
+
+		// 模态框确认
+		handlerModalConfirm(type) {
+			switch (type) {
+				case 'add-area':
+					this.saveArea = !this.saveArea
+					break
+				case 'add-phase-position':
+					this.addPhasePosition()
+					break
+				case 'edit-bus-tree':
+					this.editBusTree({ ...this.busInfoForm })
+					break
+				case 'import-dev':
+					this.importDev()
+					break
+				case 'add-dev':
+					this.handleSaveDev()
+					break
+			}
+		},
+		handleCancel() {
+			if (!findComponentDownward(this, 'add-ac-and-edit').currentNodeListIsNewest()) {
+				this.$Modal.confirm({
+					title: '警告',
+					content: '当前有未保存节点数据，是否返回设备页？',
+					onOk: () => {
+						this.editAndAddModal = false
+						findComponentDownward(this, 'add-ac-and-edit').editIndex = -1
+					}
+				})
+			} else {
+				this.editAndAddModal = false
+				findComponentDownward(this, 'add-ac-and-edit').editIndex = -1
+			}
+		},
+		// 新增智辅模态框
+		handleAddACDeviceModal() {
+			this.action = 'add'
+
+			let vm = findComponentDownward(this, 'add-ac-and-edit')
+			// 操作标识
+			vm.activeAction = 'add-ac'
+			vm.nextTo = false
+			// 更新请求参数
+			vm.parentParams = {
+				parentStationId: this.currentStation.id,
+				parentNodeId: this.currentStation.id
+			}
+
+			// 清空表单数据
+			// Object.keys(vm.basicInfo).forEach(item => {
+			// 	vm.$set(vm.basicInfo, item, '')
+			// })
+			// 清空表格数据
+			// vm.tableData = []
+			// this.editAndAddModal = true
+		},
+
+		// 保存 区域
+		handleSaveArea(res, form) {
+			if (res.code != 200) {
+				this.$Message.warning(`错误：${res.msg}`)
+			} else {
+				// 如果区域保存成功 相继发送 保存区域树的请求
+				this.currentArea = form
+
+				this.setBusInfoFormItemData('vcName', form.vcName) // 业务树 name = 上一步的 区域的 name
+				this.setBusInfoFormItemData('unitId', this.currentStation.id) // 管理单元 = 当前活动 站的 id
+				this.setBusInfoFormItemData('bindId', res.data)
+
+				this.saveBusTree(this.busInfoForm)
+			}
+		},
+		// 保存设备
+		handleSaveDev() {
+			let vm = findComponentDownward(this, 'add-ac-and-edit')
+			vm.handleSubmitAdd('basicInfo')
+		},
+		addDevUpdate(data, devTypeId) {
+			// console.log(data, '----------', devTypeId)
+
+			let { parentId, iBindType, vcCode } = this.busInfoForm
+			let { id: unitId } = this.currentStation
+
+			let nodes = [
+				{
+					devId: devTypeId,
+					vcName: data.devicename
+				}
+			]
+
+			let params = {
+				parentId,
+				vcCode,
+				unitId,
+				iBindType,
+				nodes
+			}
+
+			this.http.importDev(params).then(res => {
+				if (res.code == 200) {
+					this.$Message.success(`添加成功`)
+					this.tableLoad()
+					this.busModal.set(false)
+				} else this.$Message.warning(res.msg)
+			})
+		},
+
+		// 保存相位 add-phase-position
+		addPhasePosition() {
+			this.setBusInfoFormItemData('unitId', this.currentStation.id)
+			// 校验 相位 表单的必填项
+			this.validateComForm('phase-position-form', () => {
+				let params = { ...this.busInfoForm }
+				this.saveBusTree(params)
+			})
+		},
+		// 导入设备
+		importDev() {
+			let treeNodes = this.$refs['import-tree'].getCheckedNodes()
+			let { parentId, iBindType } = this.busInfoForm
+			let { id: unitId } = this.currentStation
+			let nodes = treeNodes.map(item => {
+				let { id: devId, vcName } = item
+				return {
+					devId,
+					vcName
+				}
+			})
+
+			let params = {
+				parentId,
+				unitId,
+				iBindType,
+				nodes
+			}
+
+			if (!nodes.length) {
+				this.$Message.warning('未选择设备节点')
+				return
+			}
+
+			this.http.importDev(params).then(res => {
+				if (res.code == 200) {
+					this.$Message.success(`添加成功`)
+					this.tableLoad()
+					this.busModal.set(false)
+				} else this.$Message.warning(res.msg)
+			})
+		},
+
+		// 保存业务树
+		saveBusTree(params) {
+			this.http.addBusTree(params).then(res => {
+				if (res.code == '200') {
+					this.$Message.success(`添加成功`)
+					this.tableLoad()
+					this.busModal.set(false)
+				} else {
+					this.$Message.warning(res.msg)
+				}
+			})
+		},
+
+		// 修改业务树
+		editBusTree(params) {
+			this.http.editBusTree(params).then(res => {
+				if (res.code == '200') {
+					this.$Message.success(`修改成功`)
+					this.tableLoad()
+					this.busModal.set(false)
+				} else {
+					this.$Message.warning(res.msg)
+				}
+			})
+		},
+
+		// 获取子系统
+		getSubSystemTreeData() {
+			this.$api.deviceModeling
+				.getDeviceTypeTreeInfo({
+					treeType: 2,
+					subSystemId: 0,
+					type: 0
+				})
+				.then(res => {
+					if (res.code == 200) {
+						this.devTreeData = this.mapSourceToData(res.data)
+					}
+				})
+		},
+
+		// 加载 设备列表
+		devListLoad() {
+			let { vcName } = this.devListParams
+
+			let params = {
+				currentPage: 1,
+				pageSize: 5000,
+				vcName,
+				subSystemId: this.currentSubSystem ? this.currentSubSystem.id : '',
+				devTypeId: this.currentType ? this.currentType.id.replace(/[^0-9]/gi, '') : '',
+				unitId: this.currentStation.id
+			}
+
+			this.$api.deviceModeling.getAllDeviceList(params).then(res => {
+				if (res.code == 200) {
+					this.devListData = res.data.lists
+				} else this.$Message.warning(res.msg)
+			})
+		},
+		// 点击子系统的树
+		handleDSubs(data) {
+			if (!data.length) {
+				this.currentSubSystem = null
+				this.currentType = null
+
+				this.devListLoad()
+				return
+			}
+
+			if (data[0].flag == 0) {
+				this.currentSubSystem = data[0]
+				this.currentType = null
+			} else if (data[0].flag == 1) {
+				this.currentType = data[0]
+				this.currentSubSystem = null
+			}
+
+			this.devListLoad()
+		},
+
+		// components tolls -------------------------------------------------------------------------------------------------------
+		// 根据传入的 station id 获取到树节点 并选中 且排他
+		getStationNodeByUnitId(source, unitId) {
+			source.forEach(item => {
+				console.log(item)
+				if (item.id == unitId) {
+					this.currentStation = item
+					this.$set(item, 'selected', true)
+				} else {
+					if (item.selected) this.$set(item, 'selected', false)
+					this.getStationNodeByUnitId(item.children, unitId)
+				}
+			})
+		},
+		// 获取树里面的第一个变电站
+		getFirstStation(data) {
+			let arr = []
+			function temp(source) {
+				for (let i = 0; i < source.length; i++) {
+					if (source[i].flag == 1) {
+						arr.push(source[i])
+					}
+					if (source[i].children.length > 0) {
+						temp(source[i].children)
+					}
+				}
+			}
+
+			temp(data)
+
+			this.currentStation = arr[0]
+			console.log(arr[0])
+			arr[0] && this.$set(arr[0], 'selected', true)
+		},
+		// 获取 nodeKey 根据传入的 节点 id
+		getNodeById(source, id) {
+			let node = ''
+			function temp(source) {
+				source.forEach(item => {
+					if (item.id == id) {
+						node = item
+					} else {
+						temp(item.children, id)
+					}
+				})
+			}
+
+			temp(source, id)
+
+			return node
+		},
+		// 在 模态框关闭时 初始化 一些配置
+		initAtModalClose() {
+			this.currentArea = null // 清空 活动 区域
+			this.currentParentType = '' // 清空活动的 上一步 类型
+			this.$set(this.stepsConfig, 'current', 0) // 初始化 步骤条
+
+			// 初始化 类型选择的 禁用状态
+			let index = this.getTargetIndexByKey(this.busInfoFormItems, 'prop', 'iBindType')
+			this.busInfoFormItems[index].disabled = false
+
+			// 清空活动的 设备 || 子系统
+			this.currentSubSystem = null
+			this.currentType = null
+			this.devListData = []
+			this.devTreeData = []
+
+			// 清空 活动的 业务树表单
+			let obj = {
+				parentId: '0'
+			}
+			this.resetComForm(this['busInfoForm'], obj, this.formName)
+			this.resetComForm(this['busInfoForm'], obj, 'phase-position-form')
+
+			// 初始化设备模态框内容
+			let vm = findComponentDownward(this, 'add-ac-and-edit')
+			Object.keys(vm.basicInfo).forEach(item => {
+				vm.$set(vm.basicInfo, item, '')
+			})
+			// 清空表格数据
+			vm.tableData = []
+		},
+		// 设置 添加业务树的 form 表单 单个项
+		setBusInfoFormItemData(key, value) {
+			this.$set(this.busInfoForm, key, value)
+		},
+
+		// 源数据映射为需要的数据
+		mapSourceToData(source, type) {
+			return source.map(item => {
+				if (type === 'table') {
+					let targetIndex = this.enums.businessTreeNodeList.findIndex(node => node.id == item['iBindType'])
+					item['iBindTypeHtml'] = this.enums.businessTreeNodeList[targetIndex].value || ''
+					item['iBindType'] = `${item['iBindType']}`
+				} else {
+					item['expand'] = true
+				}
+
+				if (item.children.length == 0) {
+					return item
+				} else {
+					item['children'] = this.mapSourceToData(item.children, type)
+					return item
+				}
+			})
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.business-tree {
+  width: 100%;
+  height: 100%;
+  flex-align();
+
+  .org-tree-wrapper {
+    create-wrap(250px, 100%, true, true);
+    margin-right: 10px;
+    background-color: #fff;
+    padding: 8px;
+    position: relative;
+
+    > div {
+      overflow-y: auto;
+      width: 100%;
+      height: 100%;
+      padding-top: 35px;
+    }
+
+    /deep/.ivu-input-wrapper {
+      width: 234px;
+      z-index: 99;
+      top: 8px;
+      left: 50%;
+      position: absolute;
+      transform: translateX(-50%);
+    }
+  }
+
+  .table-wrapper {
+    width: calc(100% - 265px);
+    height: 100%;
+
+    /deep/ .business-tree-main {
+      position: relative;
+      width: 100%;
+      height: calc(100% - 72px);
+      background-color: #fff;
+      border-top: 1px solid #dcdee2;
+
+      > div {
+        width: 100%;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      .element-table {
+        position: initial !important;
+
+        .el-table {
+          position: initial !important;
+          padding-top: 44px;
+        }
+
+        .el-table__header-wrapper {
+          position: absolute;
+          top: 0;
+          z-index: 999;
+        }
+      }
+    }
+  }
+}
+
+.axis-form-item {
+  display: flex;
+
+  .icon-wrapper {
+    width: 80px;
+    height: 32px;
+    flex-align(center, center);
+    margin-left: 10px;
+
+    .ivu-icon {
+      font-size: 24px;
+      cursor: pointer;
+
+      &:hover {
+        color: #2d8cf0;
+      }
+    }
+  }
+
+  .ivu-input-wrapper {
+    &:first-of-type {
+      margin-right: 10px;
+    }
+  }
+}
+
+.import-tree-wrapper {
+  height: 500px;
+  position: relative;
+  display: flex;
+
+  .subs-tree-wrapper {
+    create-wrap(250px, 100%, true, true);
+    margin-right: 10px;
+    background-color: #fff;
+    padding: 8px;
+    position: relative;
+
+    > div {
+      overflow-y: auto;
+      width: 100%;
+      height: 100%;
+      padding-top: 35px;
+    }
+
+    /deep/.ivu-input-wrapper {
+      width: 234px;
+      z-index: 99;
+      top: 8px;
+      left: 50%;
+      position: absolute;
+      transform: translateX(-50%);
+    }
+  }
+
+  .dev-list-wrapper {
+    create-wrap(calc(100% - 260px), 100%, true, true);
+
+    > .dev-list {
+      height: calc(100% - 72px);
+      overflow-y: auto;
+    }
+  }
+}
+
+/deep/ .add-dev-wrapper {
+  .add-ac-and-edit .device-node .ivu-table-wrapper {
+    height: calc(100vh - 475px) !important;
+
+    > /deep/ .ivu-table {
+      > .ivu-table-body {
+        height: calc(100vh - 515px) !important;
+
+        .ivu-table-expanded-cell {
+          padding: 10px !important;
+          padding-left: 100px !important;
+        }
+      }
+
+      > .ivu-table-tip {
+        height: calc(100vh - 515px) !important;
+
+        td {
+          height: calc(100vh - 515px) !important;
+        }
+      }
+    }
+  }
+
+  .ivu-table-wrapper.isAutoHeight {
+    height: calc(100vh - 530px) !important;
+
+    > /deep/ .ivu-table {
+      > .ivu-table-body {
+        height: calc(100vh - 570px) !important;
+
+        .ivu-table-expanded-cell {
+          padding: 10px !important;
+          padding-left: 100px !important;
+          /* padding-top: 2px !important; */
+        }
+      }
+
+      > .ivu-table-tip {
+        height: calc(100vh - 570px) !important;
+
+        td {
+          height: calc(100vh - 570px) !important;
+        }
+      }
+    }
+  }
+
+  .page-action {
+    display: none;
+  }
+}
+</style>

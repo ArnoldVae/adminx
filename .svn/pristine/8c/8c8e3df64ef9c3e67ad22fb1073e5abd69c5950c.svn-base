@@ -1,0 +1,30 @@
+import axios from '@/config/api.request'
+
+export default {
+	// 获取表格数据
+	getTableList(params) {
+		return axios.request({
+			url: 'maintenance/co/list',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 新增维保单位
+	addMaintenanceDate(params) {
+		return axios.request({
+			url: 'maintenance/co/saveOrUpdate',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 删除维保单位
+	delMaintenanceDate(params) {
+		return axios.request({
+			url: 'maintenance/co/del_co',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	
+	
+}

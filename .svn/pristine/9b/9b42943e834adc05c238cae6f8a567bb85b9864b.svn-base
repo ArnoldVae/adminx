@@ -1,0 +1,226 @@
+import axios from '@/config/api.request'
+
+export default {
+	// 获取组织树信息
+	getOrgTreeInfo(params) {
+		return axios.request({
+			url: 'org/find_tree',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取设备类型树信息
+	getDeviceTypeTreeInfo(params) {
+		return axios.request({
+			url: 'sub_system/dev_type/tree',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取所有设备列表
+	getAllDeviceList(params) {
+		return axios.request({
+			url: 'dev_info/find',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 删除设备
+	deleteDevice(params) {
+		return axios.request({
+			url: '/dev_info/del',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取设备类型字典码
+	getDeviceTypeList(params) {
+		return axios.request({
+			url: 'dev_type/find',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取设备等级字典码
+	getDeviceLevelList(params) {
+		return axios.request({
+			url: 'sys_dict/data/find_list',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取基本表单信息
+	getBasicInfo(params) {
+		return axios.request({
+			url: 'sub_system/test',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取设备节点信息
+	getDeviceNodesInfo(params) {
+		return axios.request({
+			url: 'dev_info/get',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 查询未配置智辅测点列表
+	getNotConfiguredList(params) {
+		return axios.request({
+			url: 'dtu/dtu_node_list',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 查询未配置智辅节点列表
+	getNotConfiguredNode(params) {
+		return axios.request({
+			url: 'dev_info/findNodesByConditions',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 查询未配置消防测点列表
+	getNotConfiguredListByFire(params) {
+		return axios.request({
+			url: 'fire_nodeinfo/find/fire_node_list',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 查询未配置巡检测点列表
+	getNotConfiguredListByAS(params) {
+		return axios.request({
+			url: 'asnode/findAsNodeByService',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取巡检服务组织树
+	getASTreeData(params) {
+		return axios.request({
+			url: 'asservice/selectbyConditionPage',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 添加节点
+	addacNodes(params) {
+		return axios.request({
+			url: 'sub_system/test',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 提取设备
+	extractionDevices(params) {
+		return axios.request({
+			url: 'dev_info/node/extract',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 批量提取设备
+	batchExtractionDevices(params) {
+		return axios.request({
+			url: 'dev_info/simple/extract',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 删除设备节点
+	deleteDeviceNodes(params) {
+		return axios.request({
+			url: 'sub_system/test',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 编辑设备节点
+	editDeviceNodes(params) {
+		return axios.request({
+			url: 'sub_system/test',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取设备节点功能字典码
+	getNodeFunList(params) {
+		return axios.request({
+			url: 'dev_type/dev_fun/find',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 编辑设备信息
+	editDeviceInfo(params) {
+		return axios.request({
+			url: 'dev_info/update',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 新增设备信息
+	addDeviceInfo(params) {
+		return axios.request({
+			url: 'dev_info/save',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 自动创建视频设备
+	autoCreateVideoDevice(params) {
+		return axios.request({
+			url: 'devNew/videoCreate',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 自动创建灯光设备
+	autoCreateLightsDevice(params) {
+		return axios.request({
+			url: 'dev_info/automaticLightDev',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 自动创建设备
+	autoCreateDevice(params) {
+		return axios.request({
+			url: 'devNew/create',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取sm类型树信息
+	getSmTypeTreeInfo(params) {
+		return axios.request({
+			url: 'sub_system/findSubSystemSmTypeTree',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	// 获取字典码公共接口
+	getDictList(params) {
+		return axios.request({
+			url: 'sys_dict/data/find_list',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	//导入设备接口
+	devUpload(params, config) {
+		return axios.request({
+			url: 'dev_info/saveDevRltnInfo',
+			method: 'post',
+			headers: config,
+			data: params
+		})
+	},
+	//导出设备/dev_info/export
+	devExport(params) {
+		let url = axios.baseUrl
+		window.open(url + '/dev_info/export?' + params, '_blank')
+	}
+}

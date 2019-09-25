@@ -1,0 +1,487 @@
+<template>
+	<Modal v-model="modalShow" title="展示类型" class="modalBox" fullscreen>
+		<div class="modal-content">
+			<div class="tool-bar">
+				<searche-Header-Wrapper>
+					<Button type="success" size="large" icon="md-add" @click="handleadd">新增</Button>
+				</searche-Header-Wrapper>
+			</div>
+			<div class="table-content">
+				<Table stripe border :columns="tableColumns" :data="tableData" :height="650"></Table>
+			</div>
+		</div>
+		<Modal v-model="modalShow1" :title="modalTitle" :mask-closable="false" width="850">
+			<Form
+				ref="up-form"
+				:rules="ruleValidate"
+				:model="FormData"
+				:label-width="80"
+				label-position="right"
+			>
+				<Row>
+					<i-col span="11">
+						<FormItem label="模型名称" prop="vcName">
+							<Input v-model="FormData.vcName" disabled />
+						</FormItem>
+					</i-col>
+					<i-col span="12">
+						<FormItem label="模型ID" prop="devTypeId">
+							<Input v-model="FormData.devTypeId" disabled />
+						</FormItem>
+					</i-col>
+					<i-col span="11">
+						<FormItem label="组件名称" prop="vcComponent">
+							<Input v-model="FormData.vcComponent" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="12">
+						<!-- <FormItem label="组件图标" prop="icon">
+							<Input v-model="FormData.icon" placeholder="请输入..." />
+						</FormItem>-->
+						<FormItem label="组件图标" prop="iCon">
+							<RadioGroup v-model="FormData.icon">
+								<Radio
+									v-for="item in dicList"
+									:label="item.label"
+									:value="item.label"
+									:key="item.label"
+								>{{ item.title }}</Radio>
+							</RadioGroup>
+						</FormItem>
+					</i-col>
+					<i-col span="11">
+						<FormItem label="组件排序" prop="iSort">
+							<Input v-model="FormData.iSort" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="12">
+						<FormItem label="状态" prop="iIsEnable">
+							<!-- <Input v-model="FormData.iIsEnable" /> -->
+							<RadioGroup v-model="FormData.iIsEnable">
+								<Radio label="1" value="1">启用</Radio>
+								<Radio label="0" value="0">禁用</Radio>
+							</RadioGroup>
+						</FormItem>
+					</i-col>
+					<i-col span="11">
+						<FormItem label="参数1" prop="iParam1">
+							<Input v-model="FormData.iParam1" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="12">
+						<FormItem label="参数2" prop="iParam2">
+							<Input v-model="FormData.iParam2" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="11">
+						<FormItem label="参数3" prop="iParam3">
+							<Input v-model="FormData.iParam3" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="12">
+						<FormItem label="参数一" prop="vcParam1">
+							<Input v-model="FormData.vcParam1" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="11">
+						<FormItem label="参数二" prop="vcParam2">
+							<Input v-model="FormData.vcParam2" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="12">
+						<FormItem label="参数三" prop="vcParam3">
+							<Input v-model="FormData.vcParam3" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="11">
+						<FormItem label="标识" prop="iFlag">
+							<Input v-model="FormData.iFlag" placeholder="请输入..." />
+						</FormItem>
+					</i-col>
+					<i-col span="12">
+						<FormItem label="备注" prop="vcMemo">
+							<Input
+								v-model="FormData.vcMemo"
+								type="textarea"
+								:autosize="{ minRows: 2, maxRows: 5 }"
+								placeholder="请输入..."
+							/>
+						</FormItem>
+					</i-col>
+				</Row>
+			</Form>
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button type="primary" size="large" @click="handleSaveArea">确认</Button>
+			</div>
+		</Modal>
+	</Modal>
+</template>
+<script>
+import mixinTolls from '@common/mixin/tools'
+export default {
+	name: 'sub-moudel',
+	mixins: [mixinTolls],
+	components: {},
+	props: {
+		value: {
+			type: Boolean,
+			default: false
+		},
+		subModuelData: {
+			type: Object,
+			default: () => {
+				return {}
+			}
+		}
+	},
+	data() {
+		return {
+			axios: this.$api.deviceType,
+			modalShow: false,
+			modalShow1: false,
+			modalTitle: '新增',
+			tableColumns: [
+				{
+					title: '模型ID',
+					key: 'devTypeId',
+					align: 'center',
+					width: '200px'
+				},
+				{
+					title: '组件名称',
+					key: 'vcComponent',
+					align: 'center'
+				},
+				{
+					title: '组件图标',
+					key: 'icon',
+					align: 'center',
+					width: '110px'
+				},
+				{
+					title: '状态',
+					key: 'iIsEnable1',
+					align: 'center',
+					width: '70px',
+					render: (h, params) => {
+						return h('div', [params.row.iIsEnable == '1' ? h('p', params.row.iIsEnable1) : h('b', params.row.iIsEnable1)])
+					}
+				},
+				{
+					title: '排序',
+					key: 'iSort',
+					align: 'center',
+					width: '70px'
+				},
+				{
+					title: '标识',
+					key: 'iFlag',
+					align: 'center',
+					width: '70px'
+				},
+				{
+					title: '参数1',
+					key: 'iParam1',
+					align: 'center',
+					width: '110px'
+				},
+				{
+					title: '参数2',
+					key: 'iParam2',
+					align: 'center',
+					width: '110px'
+				},
+				{
+					title: '参数3',
+					key: 'iParam3',
+					align: 'center',
+					width: '110px'
+				},
+				{
+					title: '参数一',
+					key: 'vcParam1',
+					align: 'center'
+				},
+				{
+					title: '参数二',
+					key: 'vcParam2',
+					align: 'center'
+				},
+				{
+					title: '参数三',
+					key: 'vcParam3',
+					align: 'center'
+				},
+				{
+					title: '备注',
+					key: 'vcMemo',
+					align: 'center'
+				},
+				{
+					title: '操作',
+
+					key: 'action',
+					align: 'center',
+					width: 210,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										icon: 'ios-create-outline'
+									},
+									style: {
+										marginRight: '5px'
+									},
+									on: {
+										click: () => {
+											this.handleupload(params)
+										}
+									}
+								},
+								'编辑'
+							),
+							h(
+								'Button',
+								{
+									props: {
+										type: 'error',
+										icon: 'md-trash'
+									},
+									on: {
+										click: () => {
+											this.handledel(params)
+										}
+									}
+								},
+								'删除'
+							)
+						])
+					}
+				}
+			],
+			tableData: [],
+			FormData: {
+				vcName: '',
+				devTypeId: '',
+				vcComponent: '',
+				icon: '',
+				iSort: '',
+				iIsEnable: '',
+				iParam1: '',
+				iParam2: '',
+				iParam3: '',
+				vcParam1: '',
+				vcParam2: '',
+				vcParam3: '',
+				iFlag: '',
+				vcMemo: ''
+			},
+			ruleValidate: {
+				vcComponent: [{ required: true, message: '该项为必填项', trigger: 'blur' }],
+				iSort: [{ pattern: /^[0-9]\d{0,8}$/, message: '请正确输入九位以内数字', trigger: 'change' }],
+				iParam1: [{ pattern: /^[0-9]\d{0,8}$/, message: '请正确输入九位以内数', trigger: 'change' }],
+				iParam2: [{ pattern: /^[0-9]\d{0,8}$/, message: '请正确输入九位以内数', trigger: 'change' }],
+				iParam3: [{ pattern: /^[0-9]\d{0,8}$/, message: '请正确输入九位以内数', trigger: 'change' }],
+				iFlag: [{ pattern: /^[0-9]\d{0,8}$/, message: '请正确输入九位以内数', trigger: 'change' }],
+				vcMemo: [{ pattern: /^.{0,63}$/, message: '最多输入64字', trigger: 'change' }]
+			},
+			viewConfigId: '',
+			isAdd: true,
+			dicList: []
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		value: {
+			handler(newVal) {
+				this.modalShow = newVal
+				this.getList()
+				this.getDict()
+			}
+		},
+		modalShow: {
+			handler(val) {
+				if (!val) {
+					this.$emit('modalSwithc', false)
+				}
+			}
+		},
+		modalShow1: {
+			handler(val) {
+				if (!val) {
+					for (let key in this.FormData) {
+						this.FormData[key] = ''
+					}
+					this.FormData.iIsEnable = '1'
+					this.$refs['up-form'].resetFields()
+				}
+			}
+		}
+	},
+	created() {},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		getList() {
+			let params = {
+				devTypeId: this.subModuelData.devTypeId
+			}
+			this.axios
+				.findMoudleList(params)
+				.then(res => {
+					if (res.code == 200 && res.data) {
+						res.data.forEach(item => {
+							item.iIsEnable1 = item.iIsEnable == 1 ? '启用' : '禁用'
+						})
+						this.tableData = res.data
+					} else {
+						this.$Message.error(res.msg)
+					}
+				})
+				.catch(error => {
+					this.$Message.error(error.response.data.msg)
+				})
+		},
+		getDict() {
+			this.dicList = []
+			this.axios.findDicList({ dictGroupID: 1011 }).then(res => {
+				if (res.data && res.code == 200) {
+					for (let i = 0; i < res.data.length; i++) {
+						let obj = { label: res.data[i].vcName, value: res.data[i].dictID + '', title: res.data[i].vcMemo }
+						this.dicList.push(obj)
+					}
+				}
+			})
+		},
+		//新增
+		handleadd() {
+			for (let key in this.FormData) {
+				this.FormData[key] = ''
+			}
+			this.modalTitle = '新增'
+			this.modalShow1 = true
+			this.isAdd = true
+			this.FormData.iIsEnable = '1'
+			this.FormData.vcName = this.subModuelData.vcName
+			this.FormData.devTypeId = this.subModuelData.devTypeId
+			this.FormData.icon = this.dicList[0].label
+
+		},
+		//修改
+		handleupload(data) {
+			this.isAdd = false
+			this.modalTitle = '编辑'
+			this.viewConfigId = data.row.viewConfigId
+			for (let key in this.FormData) {
+				this.FormData[key] = data.row[key]
+			}
+			this.FormData.iIsEnable = this.FormData.iIsEnable + ''
+			this.modalShow1 = true
+		},
+		// 保存
+		handleSaveArea() {
+			if (this.isAdd) {
+				let params = this.FormData
+				this.validateForm('up-form', () => {
+					this.axios
+						.saveMoudle(params)
+						.then(res => {
+							if (res.code == 200) {
+								this.modalShow1 = false
+								this.getList()
+							} else {
+								this.$Message.error(res.msg)
+							}
+						})
+						.catch(error => {
+							// this.$Message.error(error)
+							this.$Message.error(error.response.data.msg)
+						})
+				})
+			} else {
+				let params = this.FormData
+				params.viewConfigId = this.viewConfigId
+				this.validateForm('up-form', () => {
+					this.axios
+						.uploadMoudle(params)
+						.then(res => {
+							if (res.code == 200) {
+								this.modalShow1 = false
+								this.getList()
+							} else {
+								this.$Message.error(res.msg)
+							}
+						})
+						.catch(error => {
+							// this.$Message.error(error)
+							this.$Message.error(error.response.data.msg)
+						})
+				})
+			}
+		},
+		handledel(data) {
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除所选项?',
+				onOk: () => {
+					let params = { viewConfigId: data.row.viewConfigId }
+					this.axios
+						.delMoudle(params)
+						.then(res => {
+							if (res.code == 200) {
+								this.$Message.success('删除成功')
+								this.getList()
+							} else {
+								this.$Message.error(res.msg)
+							}
+						})
+						.catch(error => {
+							this.$Message.error(error)
+						})
+				},
+				onCancel: () => {}
+			})
+		},
+		// 取消
+		handleModalCancel() {
+			this.modalShow1 = false
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang='stylus' scoped>
+.modalBox {
+  .modal-content {
+    width: 100%;
+    height: 100%;
+    color: #00f;
+  }
+}
+
+/deep/.ivu-table {
+  p {
+    color: #19be6b;
+  }
+
+  b {
+    font-weight: 400;
+    color: #ff9900;
+  }
+}
+</style>

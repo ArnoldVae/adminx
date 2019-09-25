@@ -1,0 +1,32 @@
+/* stylus mixins */
+flex-align(row = flex-start, column = flex-start) {
+    display: flex;
+    justify-content: row;
+    align-items: column;
+}
+
+create-wrap(w = 100px, h = 200px, border = false, radius = false, r = 4) {
+    width: w;
+    height: h;
+
+    if (border) {
+        border: 1px solid $base-border-color;
+    }
+
+    if (radius) {
+        border-radius: unit(r, px);
+    }
+}
+
+no-select() {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.rootNode {
+    background-color: #fdf5e6 !important;
+}

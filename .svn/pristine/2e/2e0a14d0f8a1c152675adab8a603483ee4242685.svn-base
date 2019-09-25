@@ -1,0 +1,1010 @@
+<template>
+	<div class="PSvgcontainer">
+		<!-- 搜索框 -->
+		<Input class="Input" v-model="InputValue" @on-enter="inputEnter(InputValue)" placeholder="请输入名称  回车搜索" style="width: 260px">
+			<Button slot="append" @click="resetClick"> 重置 </Button>
+		</Input>
+		<!-- 保存 返回按钮 -->
+		<Button class="btn" type="primary" @click="getTreeView">一键保存</Button>
+		<Button class="btn returnBtn" @click="returnList" type="warning">返回列表</Button>
+		<div id="svgCon" class="svgCon"></div>
+		<!-- 对话框 -->
+
+		<Modal v-model="isDialog" title="设备选择" :mask-closable="false" :styles="{ top: '20px' }" width="80%" footer-hide>
+			<device-modeling-modal v-if="isDialog" @callBack="callBack" />
+		</Modal>
+	</div>
+</template>
+<script>
+import CreateEdgeInteractor from './CreateEdgeInteractor'
+import CreateShapeInteractor from './CreateShapeInteractor'
+import deviceModelingModal from './device-modeling-modal'
+import axios from 'axios'
+import { log } from 'util'
+export default {
+	name: 'svgConfig',
+	props: {
+		url: {
+			type: String
+		},
+		id: {
+			type: String
+		},
+		pageId: {
+			type: String
+		},
+		iPageType: {
+			type: String
+		},
+		propRow: {
+			type: Object
+		}
+	},
+	components: {
+		deviceModelingModal
+	},
+	data() {
+		return {
+			item: {},
+			palette_config: {
+				scene: {
+					name: '场景',
+					items: []
+				},
+				video: {
+					name: '视频',
+					items: []
+				},
+				dev: {
+					name: '设备',
+					items: []
+				},
+				root: {
+					name: '机器人',
+					items: []
+				},
+				material: {
+					name: '素材',
+					items: []
+				}
+			},
+			treeList: [],
+			InputValue: '',
+			isDialog: false,
+			dialogVal: null,
+			paletteDataModel: {},
+			nodeInfo: [],
+			localHt: null,
+			dataModel: null,
+			treeDataModel: null,
+			g2d: null,
+			palette: null,
+			rulerFrame: null,
+			borderPane: null,
+			topSplit: null,
+			leftSplit: null,
+			treeView: null,
+			leftTreeView: null,
+			propertyPane: null,
+			rightSplit: null,
+			mainSplit: null,
+			paletteNode: null,
+			dialog: null,
+			quickFinder: null,
+			isFulfil: [],
+			loading: null,
+			shapeInteractor: null,
+			edgeInteractor: null,
+			rightAngleInteractor: null,
+			oldDialogVal: null,
+			newDialogVal: null,
+			toolbar_config: [
+				{
+					id: 'edit',
+					unfocusable: true,
+					toolTip: '编辑',
+					groupId: 'bar',
+					icon: {
+						width: 16,
+						height: 16,
+						comps: [
+							{
+								type: 'image',
+								name: 'symbols/toolbarIcon/select.json',
+								color: {
+									func: function(item) {
+										return item.selected ? '#1E90FF' : '#000'
+									}
+								}
+							}
+						]
+					},
+					action: function() {
+						g2d.setEditable(true)
+					}
+				},
+				{
+					id: 'edge',
+					unfocusable: true,
+					toolTip: '连线',
+					groupId: 'bar',
+					icon: {
+						width: 16,
+						height: 16,
+						comps: [
+							{
+								type: 'image',
+								name: 'symbols/toolbarIcon/edge.json',
+								color: {
+									func: function(item) {
+										return item.selected ? '#1E90FF' : '#000'
+									}
+								}
+							}
+						]
+					},
+					action: function() {
+						g2d.setInteractors([edgeInteractor])
+						g2d.sm().cs()
+					}
+				},
+				{
+					id: 'rightAngle',
+					unfocusable: true,
+					toolTip: '直角连线',
+					groupId: 'bar',
+					icon: {
+						width: 16,
+						height: 16,
+						comps: [
+							{
+								type: 'image',
+								name: 'symbols/toolbarIcon/right-angle.json',
+								color: {
+									func: function(item) {
+										return item.selected ? '#1E90FF' : '#000'
+									}
+								}
+							}
+						]
+					},
+					action: function() {
+						g2d.setInteractors([rightAngleInteractor])
+						g2d.sm().cs()
+					}
+				},
+				{
+					id: 'polyline',
+					unfocusable: true,
+					toolTip: '多边形',
+					groupId: 'bar',
+					icon: {
+						width: 16,
+						height: 16,
+						comps: [
+							{
+								type: 'image',
+								name: 'symbols/toolbarIcon/polygon.json',
+								color: {
+									func: function(item) {
+										return item.selected ? '#1E90FF' : '#000'
+									}
+								}
+							}
+						]
+					},
+					action: function() {
+						g2d.setInteractors([shapeInteractor])
+						g2d.sm().cs()
+					}
+				}
+			],
+			datamodel_config: {
+				v: '6.2.8',
+				p: {
+					background: 'rgb(61,61,61)',
+					layers: ['0', 1],
+					autoAdjustIndex: true,
+					hierarchicalRendering: true
+				},
+				d: []
+			}
+		}
+	},
+	created() {
+		this.getChang()
+	},
+	beforeMount() {},
+	mounted() {
+		let _this = this
+		_this.svgHt()
+		// _this.initPalette()
+		_this.initGraphView()
+		_this.initTreeView()
+		_this.initPropertyView()
+		// _this.lodeSvgHt();
+	},
+	watch: {
+		dialogVal(newVal, oldVal) {
+			// console.log('newVal', newVal)
+			// console.log('oldVal', oldVal)
+			this.oldDialogVal = oldVal
+			this.newDialogVal = newVal
+		}
+	},
+	methods: {
+		//弹框回调
+		callBack(val) {
+			if (val.shut) {
+				this.isDialog = false
+				this.dialogVal = null
+			} else if (val.devRow) {
+				this.isDialog = false
+				let index = this.palette_config.dev.items.findIndex(item => item.devId == val.devRow.devId)
+
+				let currentData = this.palette_config.dev.items[index]
+
+				let node = this.dataModel.getDataByTag(this.dialogVal)
+				if (index == -1) {
+					node.setTag(val.devRow.devId)
+					node.setName(val.devRow.vcName)
+					node.a('i_Type', 3)
+					node.a('i_NodeType', '设备')
+					node.a('vc_SourceID', val.devRow.devId)
+					node.formPane = this.createFormPane(val.devRow.devId)
+				} else {
+					if (currentData.draggable == undefined || currentData.draggable == true) {
+						node.setTag(val.devRow.devId)
+						node.setName(val.devRow.vcName)
+						node.a('i_Type', 3)
+						node.a('i_NodeType', '设备')
+						node.a('vc_SourceID', val.devRow.devId)
+						node.formPane = this.createFormPane(val.devRow.devId)
+						currentData.draggable = false
+						let tagNode = this.leftTreeView.getDataModel().getDataByTag(val.devRow.devId)
+						tagNode.s('draggable', false)
+					} else {
+						this.$Message.warning('该设备已经在图纸上已经存在！！！')
+					}
+				}
+				this.resetDataNode()
+			}
+		},
+		//重置单条数据，改变数据控制是否可以拖拽
+		resetDataNode() {
+			this.isDrag(this.newDialogVal, true)
+			let tagData = this.leftTreeView.getDataModel().getDataByTag(this.newDialogVal)
+			if (tagData) {
+				tagData.s('draggable', true)
+			}
+		},
+
+		// 重置按钮 清空搜索框
+		resetClick() {
+			this.InputValue = ''
+			// 重置ht组件
+			this.leftTreeView.dm().clear()
+			//调用下方创建树的方法
+			this.initPalette()
+		},
+
+		// 添加控制是否可以拖拽属性
+		isDrag(vcSourceId, isFalse) {
+			let dev = this.palette_config.dev.items
+			let video = this.palette_config.video.items
+			let scene = this.palette_config.scene.items
+			// 设备数据查找
+			let devIndex = dev.findIndex(item => item.devId == vcSourceId)
+			if (devIndex != -1) {
+				dev[devIndex].draggable = isFalse
+				// console.log(dev[devIndex]);
+			}
+			// 视频数据查找
+			let videoIndex = video.findIndex(item => item.devId == vcSourceId)
+			if (videoIndex != -1) {
+				video[videoIndex].draggable = isFalse
+				// console.log(video[videoIndex]);
+			}
+			// 场景数据查找
+			let sceneIndex = scene.findIndex(item => item.sceneId == vcSourceId)
+			if (sceneIndex != -1) {
+				scene[sceneIndex].draggable = isFalse
+				// console.log(scene[sceneIndex]);
+			}
+		},
+
+		// 遍历以以拖拽设备列表
+		resetData() {
+			let nodeInfo = this.nodeInfo
+			for (let i = 0; i < nodeInfo.length; i++) {
+				let element = nodeInfo[i].vcSourceId
+				this.isDrag(element, false)
+			}
+
+			this.initPalette()
+			this.lodeSvgHt()
+		},
+
+		// 搜索框
+		inputEnter(val) {
+			let arr = []
+			// 查找搜索的内容
+			for (let name in this.palette_config) {
+				let obj = this.palette_config[name]
+				if (obj.items.length) {
+					for (let j = 0; j < obj.items.length; j++) {
+						let element = obj.items[j]
+						//数据匹配
+						if (element.vcName.search(val) != -1) {
+							arr.push({ ...element, isType: obj.name })
+						}
+					}
+				}
+			}
+			// console.log(arr)
+
+			//清空树dataModel
+			this.leftTreeView.dm().clear()
+
+			//注释参考 initPalette 方法
+			var parent = new this.localHt.Data()
+			parent.a('isShow', true)
+			parent.setName('搜索结果')
+			parent.setTag('搜索结果')
+			this.treeDataModel.add(parent)
+			this.leftTreeView.expand(parent)
+
+			if (arr.length == 0) {
+				return
+			}
+			arr.forEach(item => {
+				var child = new this.localHt.Data()
+				child.setName(item.vcName)
+				if (item.isType == '设备') {
+					if (item.vcIcon && item.vcIcon != '' && item.vcIcon != null && item.vcIcon != 'null') {
+						child.setIcon(`symbols/QIF/${item.vcIcon}.json`)
+					} else {
+						child.setIcon('assets/libs/ht/storage/symbols/basic/dev.png')
+					}
+					child.a('nType', 3)
+					child.setTag(item.devId)
+				} else if (item.isType == '视频') {
+					if (item.vcIcon && item.vcIcon != '' && item.vcIcon != null && item.vcIcon != 'null') {
+						child.setIcon(`symbols/QIF/${item.vcIcon}.json`)
+					} else {
+						child.setIcon('assets/libs/ht/storage/assets/svg/Dark_icons_qiujiOnline.png')
+					}
+					child.a('nType', 2)
+					child.setTag(item.devId)
+				} else if (item.isType == '场景') {
+					child.setIcon('assets/libs/ht/storage/assets/svg/Dark_icons_qiujiAlarm.png')
+					child.a('nType', 1)
+					child.setTag(item.sceneId)
+				} else if (item.isType == '机器人') {
+					child.setIcon('assets/libs/ht/storage/assets/svg/robot-img.png')
+					child.a('nType', 4)
+				} else if (item.isType == '素材') {
+					child.setIcon('assets/libs/ht/storage/assets/svg/robot-img.png')
+					child.a('nType', 5)
+					child.setTag(item.devId)
+				}
+				child.a('item', item)
+				child.setParent(parent)
+				child.s('draggable', item.draggable === undefined ? true : item.draggable)
+				this.treeDataModel.add(child)
+			})
+
+			//重置组件图元
+			this.leftTreeView.validate()
+		},
+
+		svgHt() {
+			let localHt = (this.localHt = global.ht)
+			let dataModel = (global.dataModel = this.dataModel = new ht.DataModel())
+			//创建存放左侧树的dataModel
+			let treeDataModel = (this.treeDataModel = new localHt.DataModel())
+			//绘制dataModel配置
+			dataModel.deserialize(this.datamodel_config)
+			let g2d = (this.g2d = new localHt.graph.GraphView(dataModel))
+			// 组件面板
+			// let palette = (this.palette = new localHt.widget.Palette())
+			let leftTreeView = (this.leftTreeView = new localHt.widget.TreeView(treeDataModel))
+
+			let border = new localHt.widget.BorderPane()
+			let topSplit = (this.topSplit = new localHt.widget.SplitView(border, leftTreeView, 'v', 33))
+			// 刻度尺
+			let rulerFrame = (this.rulerFrame = new localHt.widget.RulerFrame(g2d))
+			// 编辑区域
+			let borderPane = (this.borderPane = new localHt.widget.BorderPane())
+			// borderPane.setTopView(toolbar)
+			borderPane.setTopHeight(25)
+			borderPane.setCenterView(rulerFrame)
+
+			let leftSplit = (this.leftSplit = new localHt.widget.SplitView(topSplit, borderPane, 'h', 260))
+			// 树组件
+			let treeView = (this.treeView = new localHt.widget.TreeView(dataModel))
+			// 属性面板
+			let propertyPane = (this.propertyPane = new localHt.widget.PropertyView(dataModel))
+			let topBorder = new localHt.widget.BorderPane()
+			let rightTopSplit = (this.topSplit = new localHt.widget.SplitView(topBorder, propertyPane, 'v', 24))
+			let rightSplit = (this.rightSplit = new localHt.widget.SplitView(rightTopSplit, treeView, 'v', 0.4))
+			// 场景主面板
+			let mainSplit = (this.mainSplit = new localHt.widget.SplitView(leftSplit, rightSplit, 'h', -260))
+			// let quickFinder = (this.quickFinder = new localHt.QuickFinder(dataModel, 'name'))
+
+			g2d.setEditable(true)
+			g2d.setLayers(['0', 1])
+
+			// 加载图纸
+			this.$api.svgConfig.getHt(this.propRow.vcUrl).then(res => {
+				let json = ht.Default.parse(res)
+				dataModel.deserialize(json)
+				g2d.fitContent(true)
+			})
+			if (g2d.getEditInteractor()) {
+				g2d.getEditInteractor().setStyle('anchorVisible', false)
+			}
+			const svgContanier = document.getElementById('svgCon')
+			mainSplit.addToDOM(svgContanier)
+
+			//右侧树节点显示筛选
+			this.treeView.setVisibleFunc(function(data) {
+				return data.a('vc_SourceID') != undefined
+			})
+			//左侧树节点显示筛选
+			this.leftTreeView.setVisibleFunc(function(data) {
+				//通过筛选自定义标识符控制是否显示
+				if (data.a('isShow') || data.a('nType') != undefined) {
+					return true
+				}
+				return false
+			})
+			// g2d.fitContent(true)
+		},
+
+		// 获取左面板的数据
+		async getChang() {
+			//全局提示
+			let loading = this.$loading({
+				lock: true,
+				text: '数据量较大，请耐心等待！',
+				spinner: 'el-icon-loading',
+				background: 'rgba(0, 0, 0, 0.7)',
+				customClass: 'loadingClass'
+			})
+
+			try {
+				// 以拖拽过的图元
+				let nodeInfoRes = await this.$api.svgConfig.getSvgNodeInfo({ unitId: this.id, pageId: this.pageId })
+				this.nodeInfo = nodeInfoRes.data
+				// console.log(this.nodeInfo)
+			} catch (err) {
+				console.log(err)
+			}
+			try {
+				// 设备
+				let devRes = await this.$api.svgConfig.getDev(this.id)
+				this.palette_config.dev.items = devRes.data
+				// console.log(this.palette_config.dev.items)
+			} catch (err) {
+				console.log(err)
+			}
+			try {
+				// 场景
+				let sceneRes = await this.$api.svgConfig.getScene(this.id)
+				this.palette_config.scene.items = sceneRes.data
+				// console.log(this.palette_config.scene.items)
+			} catch (err) {
+				console.log(err)
+			}
+			try {
+				// 视频
+				let videoRes = await this.$api.svgConfig.getVideo(this.id)
+				this.palette_config.video.items = videoRes.data
+				// console.log(this.palette_config.video.items)
+			} catch (err) {
+				console.log(err)
+			}
+			// try {
+			// 素材
+			let materialRes = await this.$api.getMaterial()
+			// console.log('materialRes', materialRes)
+			this.palette_config.material.items = materialRes.data
+			// console.log(this.palette_config.video.items)
+			// } catch (err) {
+			// 	console.log(err)
+			// }
+
+			this.resetData()
+			//关闭全局提示
+			loading.close()
+		},
+		// 初始化组件面板中的内容
+		initPalette() {
+			let arr = []
+			for (var name in this.palette_config) {
+				//创建data
+				var parent = new this.localHt.Data(),
+					info = this.palette_config[name]
+				//自定义标识符
+				parent.a('isShow', true)
+				//设置名称和tag
+				parent.setName(info.name)
+				parent.setTag(info.name)
+
+				//把节点添加到树dataModel中
+				this.treeDataModel.add(parent)
+				info.items.forEach(item => {
+					//创建新data
+					var child = new this.localHt.Data()
+					//设置名称
+					child.setName(item.vcName)
+					if (info.name == '设备') {
+						//设置显示的图标
+						if (item.vcIcon && item.vcIcon != '' && item.vcIcon != null && item.vcIcon != 'null') {
+							child.setIcon(`symbols/QIF/${item.vcIcon}.json`)
+						} else {
+							child.setIcon('assets/libs/ht/storage/symbols/basic/dev.png')
+						}
+						//设置标识符
+						child.a('nType', 3)
+						//设置tag
+						child.setTag(item.devId)
+					} else if (info.name == '视频') {
+						if (item.vcIcon && item.vcIcon != '' && item.vcIcon != null && item.vcIcon != 'null') {
+							child.setIcon(`symbols/QIF/${item.vcIcon}.json`)
+						} else {
+							child.setIcon('assets/libs/ht/storage/assets/svg/Dark_icons_qiujiOnline.png')
+						}
+						child.a('nType', 2)
+						child.setTag(item.devId)
+					} else if (info.name == '场景') {
+						child.setIcon('assets/libs/ht/storage/assets/svg/Dark_icons_qiujiAlarm.png')
+						child.a('nType', 1)
+						child.setTag(item.sceneId)
+					} else if (info.name == '机器人') {
+						child.setIcon('assets/libs/ht/storage/assets/svg/robot-img.png')
+						child.a('nType', 4)
+					} else if (info.name == '素材') {
+						child.setIcon('assets/libs/ht/storage/assets/svg/robot-img.png')
+						child.a('nType', 5)
+						child.setTag(item.devId)
+					}
+					//把当前数据保存到自定义属性中
+					child.a('item', item)
+					//把当前data添加上面父级data中
+					child.setParent(parent)
+					//添加是否可拖拽标识  用于下方控制拖拽
+					child.s('draggable', item.draggable === undefined ? true : item.draggable)
+					// console.log(child)
+					this.treeDataModel.add(child)
+				})
+				arr.push(parent)
+			}
+
+			this.treeList = arr
+		},
+		// 初始化拓扑图
+		initGraphView() {
+			let currentDiv = null
+			let size = 24
+			this.leftTreeView.handleDragAndDrop = (e, state) => {
+				var data
+				if (state === 'prepare') {
+					//获取当前点击的图元
+					data = this.leftTreeView.getDataAt(e)
+					//获取选中的模型设置选中的数据
+					this.leftTreeView.sm().ss(data)
+					//根据上方自定义属性判断是否可以拖拽
+					if (data && data.s('draggable')) {
+						//创建的dom节点是否清空
+						if (!currentDiv) {
+							//动态创建dom节点
+							currentDiv = this.localHt.Default.createElement('div')
+							currentDiv.style.width = size + 'px'
+							currentDiv.style.height = size + 'px'
+							currentDiv.style.borderWidth = '1px'
+							currentDiv.style.borderStyle = 'solid'
+							currentDiv.style.borderColor = '#dcdee2'
+						}
+						//保存当前选中的图元的tag到dom节点的自定义属性标签中
+						currentDiv.setAttribute('nodeTag', data.getTag())
+					} else {
+						//判断点击的是否是图元
+						if (data.a('nType') != undefined) {
+							this.$Message.warning('该设备已被拖拽！！！')
+						}
+					}
+				} else if (state === 'begin') {
+					if (currentDiv) {
+						var pagePoint = this.localHt.Default.getPagePoint(e)
+						currentDiv.style.left = pagePoint.x - size / 2 + 'px'
+						currentDiv.style.top = pagePoint.y - size / 2 + 'px'
+						document.body.appendChild(currentDiv)
+					}
+				} else if (state === 'between') {
+					if (currentDiv) {
+						// console.log(currentDiv)
+						var pagePoint = this.localHt.Default.getPagePoint(e)
+						currentDiv.style.left = pagePoint.x - size / 2 + 'px'
+						currentDiv.style.top = pagePoint.y - size / 2 + 'px'
+					}
+				} else {
+					if (currentDiv) {
+						//判断交互事件所处位置是否在View组件之上
+						if (this.localHt.Default.containedInView(e, this.g2d)) {
+							//调用下方创建node节点的方法
+							this.handleDrop(currentDiv.getAttribute('nodeTag'), e)
+						}
+						document.body.removeChild(currentDiv)
+						currentDiv = null
+					}
+				}
+			}
+
+			// 删除图元信息
+			this.dataModel.mm(e => {
+				if (e.kind == 'remove') {
+					// 图纸上的图元删除 改变左侧组件图元可以拖拽
+					// let tag = this.leftTreeView.getDataModel().getDataByTag(e.data._attrObject.vc_SourceID)
+					// console.log(tag)
+					// tag._styleMap.draggable = true
+					this.leftTreeView.getDataModel().toDatas(data => {
+						if (data.getTag() == e.data._attrObject.vc_SourceID) {
+							data.s('draggable', true)
+						}
+					})
+
+					this.isDrag(e.data._attrObject.vc_SourceID, true)
+					// 重置组件图元
+					this.leftTreeView.validate()
+				}
+			})
+		},
+		// 初始化树组件
+		initTreeView() {
+			// 重载树组件上的文本显示
+
+			this.treeView.getLabel = function(data) {
+				if (data instanceof global.ht.Text) {
+					return data.s('text')
+				} else if (data instanceof global.ht.Shape) {
+					return data.getName() || '不规则图形'
+				}
+				return data.getName() || '节点'
+			}
+			// 重载树组件上的图标显示
+			let oldGetIconFunc = this.treeView.getIcon
+			this.treeView.getIcon = function(data) {
+				if (data instanceof global.ht.Text) {
+					return 'ht/storage/symbols/text.json'
+				}
+				let img = data.getImage()
+				return img || oldGetIconFunc.apply(this, arguments)
+			}
+		},
+		// 初始化属性组件
+		initPropertyView() {
+			// this.propertyPane.setHeaderLabels(['属性', '值'])
+			let propertyView = this.propertyPane
+			let dev_properties = [
+				{ name: 'parentName', displayName: '图纸名称', accessType: 'attr' },
+				{ name: 'name', displayName: '名称', editable: true },
+				// { name: 'tag', displayName: 'tag标签', accessType: 'attr', editable: true },
+				{ name: 'i_NodeType', displayName: '图元类型', accessType: 'attr' },
+				{ name: 'vc_SourceID', displayName: '源ID', accessType: 'attr' },
+				{ name: 'iParam1', displayName: '参数1', accessType: 'attr', editable: true },
+				{ name: 'iParam2', displayName: '参数2', accessType: 'attr', editable: true },
+				{ name: 'iParam3', displayName: '参数3', accessType: 'attr', editable: true },
+				{ name: 'sort', displayName: '排序', accessType: 'attr', editable: true },
+				{ name: 'functionCode', displayName: '设备功能编码', accessType: 'attr', editable: true },
+				{ name: 'vc_Path', displayName: '图元路径', accessType: 'attr' },
+				{
+					name: 'position',
+					displayName: '位置',
+					getValue: function(data) {
+						let position = data.getPosition()
+						return 'x: ' + parseInt(position.x) + ', y: ' + parseInt(position.y)
+					}
+				},
+				{
+					name: 'rotation',
+					displayName: '旋转',
+					getValue: function(data) {
+						let rotation = data.getRotation()
+						return rotation
+					}
+				},
+				{
+					displayName: '宽度',
+					name: 'width',
+					valueType: 'number',
+					editable: true
+				},
+				{
+					displayName: '高度',
+					name: 'height',
+					valueType: 'number',
+					editable: true
+				},
+				{
+					displayName: '绑定数据源',
+					name: 'click',
+					accessType: 'attr',
+					drawPropertyValue: (g, property, value, rowIndex, x, y, w, h, data, view) => {
+						return this.fillFormPane(data.formPane, w, h)
+					}
+				}
+			]
+
+			this.dataModel.sm().ms(function() {
+				// 监听选中变化事件
+				propertyView.setProperties(null)
+				let data = global.dataModel.sm().ld()
+
+				if (data == null || !data.a('vc_SourceID')) {
+					global.dataModel.getSelectionModel().removeSelection(data)
+					return
+				}
+				if (data instanceof global.ht.Data) {
+					// data 类型，所有的节点都基于这个类型
+					propertyView.addProperties(dev_properties)
+				}
+			})
+		},
+
+		fillFormPane(formP, w, h) {
+			if (formP === undefined) {
+				return
+			}
+			formP.setWidth(w)
+			formP.setHeight(h)
+			formP.setHGap(0)
+			return formP.getView()
+		},
+		//创建表单按钮
+		createFormPane(tag) {
+			//创建表单面板
+			var formPane = new ht.widget.FormPane()
+			formPane.setPadding(0)
+			var tField = new ht.widget.TextField()
+			tField.setText('')
+			tField.setDisabled(true)
+			formPane.addRow(
+				[
+					// {
+					// 	id: 'tag',
+					// 	element: tField
+					// },
+					{
+						button: {
+							label: '选择',
+							icon: 'grid_icon',
+							labelColor: '#fff',
+							background: 'rgb(45, 140, 240)',
+							onClicked: () => {
+								this.isDialog = true
+								this.dialogVal = tag
+								// console.log('click', tag)
+							}
+						}
+					}
+				],
+				[0.5, 0.1]
+			)
+			return formPane
+		},
+
+		// 被拖拽的元素在目标元素上同时鼠标放开触发的事件
+		handleDrop(paletteNode, e) {
+			e.preventDefault()
+			if (paletteNode) {
+				//根据拖拽的图元的tag进行查找节点
+				let tagNode = this.leftTreeView.getDataModel().getDataByTag(paletteNode)
+				let item = tagNode.a('item')
+				let image = tagNode.getIcon()
+
+				// 获取事件下的节点
+				let node = new this.localHt.Node()
+				node.setImage(image)
+				node.setName(item.vcName)
+
+				node.p(this.g2d.lp(e))
+				node.setSize(10, 10)
+				node.s('label', '')
+				node.setLayer(1)
+				node.a('pageId', this.pageId)
+				node.a('parentName', this.propRow.vcName)
+				node.a('functionCode', '')
+				let tag = null
+				node.a('i_Type', tagNode.a('nType'))
+				if (tagNode.a('nType') == 1) {
+					node.a('i_NodeType', '场景')
+					tag = item.sceneId
+					node.a('vc_SourceID', item.sceneId)
+					node.setTag(item.sceneId)
+					node.a('vc_Path', image)
+				} else if (tagNode.a('nType') == 2) {
+					node.a('i_NodeType', '视频')
+					tag = item.devId
+					node.a('vc_SourceID', item.devId)
+					node.setTag(item.devId)
+					node.a('vc_Path', image)
+				} else if (tagNode.a('nType') == 3) {
+					node.a('i_NodeType', '设备')
+					tag = item.devId
+					node.a('vc_SourceID', item.devId)
+					node.setTag(item.devId)
+					node.a('vc_Path', image)
+				} else if (tagNode.a('nType') == 4) {
+					node.a('i_NodeType', '机器人')
+					tag = item.robotId
+					node.a('vc_SourceID', item.robotId)
+					node.setTag(item.robotId)
+					node.a('vc_Path', image)
+				} else if (tagNode.a('nType') == 5) {
+					node.a('i_NodeType', '素材')
+					tag = item.devId
+					node.a('vc_SourceID', item.devId)
+					node.setTag(item.devId)
+					node.a('vc_Path', image)
+				}
+				// 设置当前图元不可再拖拽
+				this.leftTreeView.getDataModel().toDatas(data => {
+					if (data.getTag() == paletteNode) {
+						data.s('draggable', false)
+					}
+				})
+				//改变原数据中的标识
+				this.isDrag(paletteNode, false)
+				// 重置组件图元
+				this.leftTreeView.validate()
+
+				this.g2d.dm().add(node)
+				this.g2d.sm().ss(node)
+				//创建表单
+				node.formPane = this.createFormPane(tag)
+			}
+		},
+		// 获取树结构的添加数据
+		getTreeView() {
+			let datasModel = []
+			this.dataModel.each(function(data) {
+				if (data.a('vc_SourceID')) {
+					let datasNode = {
+						pageId: data.a('pageId'),
+						vcSourceId: data.a('vc_SourceID'),
+						vcName: data.getName(),
+						fPageX: data.getPosition().x,
+						fPageY: data.getPosition().y,
+						fPageZ: data.getRotation(),
+						iWidth: data.getWidth(),
+						iOrder: data.a('sort'),
+						iHeight: data.getHeight(),
+						vcPath: data.getImage(),
+						iNodeType: data.a('i_Type'),
+						functionCode: data.a('functionCode'),
+						iParam1: data.a('iParam1'),
+						iParam2: data.a('iParam2'),
+						iParam3: data.a('iParam3')
+					}
+					datasModel.push(datasNode)
+				}
+			})
+			let params = {
+				pageId: this.pageId,
+				lists: datasModel
+			}
+			// 数据保存
+			this.$api.svgConfig.getSvgNodeSaveInfo(params).then(res => {
+				if (res && res.code == 200) {
+					this.$Message.success('保存成功')
+				} else {
+					this.$Message.warning('保存失败')
+				}
+			})
+		},
+		// 返回列表
+		returnList() {
+			let subFlag = false
+			this.$emit('subChange', subFlag)
+		},
+
+		// 图元的信息添加上dataModel中
+		lodeSvgHt() {
+			this.nodeInfo.forEach(item => {
+				let node = new this.localHt.Node()
+				if (item.vcPath.indexOf('ht') == 0) {
+					node.setImage(`assets/libs/${item.vcPath}`)
+				} else {
+					node.setImage(item.vcPath)
+				}
+
+				node.setTag(item.vcSourceId)
+				//设置显示位置
+				node.setPosition(parseFloat(item.fPageX), parseFloat(item.fPageY))
+				//设置旋转角度
+				node.setRotation(item.fPageZ ? parseFloat(item.fPageZ) : 0)
+				node.setName(item.vcName)
+				node.setSize(parseFloat(item.iWidth), parseFloat(item.iHeight))
+				node.a('vc_SourceID', item.vcSourceId)
+				node.a('vc_Path', item.vcPath)
+				node.a('i_Type', item.iNodeType)
+				node.a('parentName', this.propRow.vcName)
+				node.a('functionCode', item.functionCode)
+				if (item.iNodeType == 1) {
+					node.a('i_NodeType', '场景')
+				} else if (item.iNodeType == 2) {
+					node.a('i_NodeType', '视频')
+				} else if (item.iNodeType == 3) {
+					node.a('i_NodeType', '设备')
+				} else if (item.iNodeType == 4) {
+					node.a('i_NodeType', '机器人')
+				} else if (item.iNodeType == 5) {
+					node.a('i_NodeType', '素材')
+				}
+
+				node.a('pageId', this.pageId)
+				node.a('sort', item.iOrder)
+				node.a('iParam1', item.iParam1)
+				node.a('iParam2', item.iParam2)
+				node.a('iParam3', item.iParam3)
+				node.setLayer(1)
+				node.s('label', '')
+				node.s('draggable', false)
+				this.dataModel.add(node)
+				//创建表单
+				node.formPane = this.createFormPane(item.vcSourceId)
+			})
+		}
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.PSvgcontainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+
+  .btn {
+    position: absolute;
+    top: 0;
+    right: 120px;
+    width: 140px;
+    line-height: 13px;
+    height: 24px;
+    z-index: 99999;
+    font-size: 14px;
+    border-radius: 0;
+  }
+
+  .Input {
+    position: absolute;
+    top: 0;
+    z-index: 99999;
+  }
+
+  .returnBtn {
+    width: 120px;
+    right: 0;
+  }
+
+  .svgCon {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+  }
+
+  /deep/.ivu-input {
+    border: 0.06444rem solid #dcdee2;
+  }
+
+  /deep/.ivu-input-group-append {
+    border: 0.06444rem solid #dcdee2;
+  }
+
+  /deep/.ivu-modal-body {
+    padding: 0 10px;
+  }
+}
+</style>

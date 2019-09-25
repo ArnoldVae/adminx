@@ -1,0 +1,630 @@
+<template>
+	<div class="fire-linkage-config">
+		<!-- 左侧树 -->
+		<div class="left-tree">
+			<search-tree :data="treeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索">
+				<Icon type="ios-search" slot="suffix"/>
+			</search-tree>
+		</div>
+		<div class="right-content">
+			<!-- 表格区 -->
+			<i-form :model="formInline" inline label-position="right">
+				<transition name="el-fade-in-linear">
+					<div class="search-bar">
+						<searche-Header-Wrapper>
+							<form-item
+								title="视频配置"
+								type="select"
+								v-model="formInline.linkStat"
+								@on-change="statChange"
+								:options="typeList"
+								:setings="{ value: 'code', label: 'name' }"
+								noMBottom
+							>
+							</form-item>
+							<form-item
+								title="svg配置"
+								type="select"
+								@on-change="statChange"
+								v-model="formInline.svgStat"
+								:options="typeList"
+								:setings="{ value: 'code', label: 'name' }"
+								noMBottom
+							>
+							</form-item>
+						</searche-Header-Wrapper>
+					</div>
+				</transition>
+			</i-form>
+			<div class="table-content">
+				<Table
+					border
+					ref="selection"
+					:columns="tableColumns"
+					:data="tableData"
+					highlight-row
+					@on-row-click="showRowData"
+					height="650"
+				></Table>
+				<!--				 分页-->
+				<div class="table-page">
+					<div class="page-content">
+						<Page
+							@on-change="handleChangePage"
+							@on-page-size-change="handleChangePageSize"
+							:total="total"
+							:current="page"
+							:page-size="pageSize"
+							show-elevator
+							show-total
+							show-sizer
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="right-end">
+			<div class="transfer">
+				<div class="title">
+					<h2>联动视频配置</h2>
+				</div>
+				<qfTransfer style="height: 400px" ref="qfTransfer" :tree-list="videoAllList"></qfTransfer>
+			</div>
+			<div class="source">
+				<!--<i-button type="primary" @click="handleUploadBtn()">上传</i-button>-->
+				<div class="title">
+					<h2>联动灭火资源配置</h2>
+				</div>
+
+				<div class="source-content">
+					<div class="card" @click="handleUploadBtn()">
+						<Icon type="md-add"/>
+					</div>
+				</div>
+			</div>
+			<i-button type="primary" @click="handleSubmit('formInline')">确定</i-button>
+		</div>
+		<Modal v-model="modalShow" title="文件上传" :mask-closable="false">
+			<div class="upload-content">
+				<Steps class="steps" :current="step" title="文件上传步骤111111">
+					<Step title="步骤一" content="择上传文件 (支持.svg格式的文件)"></Step>
+					<Step title="步骤二" content="选择完毕后点击 '上传' 按钮进行上传"></Step>
+					<Step title="步骤三" content="等待上传完成"></Step>
+				</Steps>
+				<Upload type="drag" :before-upload="handleUpload" action :accept="accept" :format="Format">
+					<div style="padding: 20px 0">
+						<Icon type="ios-add-circle-outline" size="52" style="color: #3399ff"></Icon>
+						<p>选择上传文件</p>
+					</div>
+				</Upload>
+				<div v-if="file !== null" class="up-box">
+					待上传文件:
+					<span>
+						<div class="del" @click="removeFile">
+							<!-- <Icon type="md-trash" /> -->
+							<i class="el-icon-delete"></i>
+						</div>
+						{{ file.name }}
+					</span>
+				</div>
+			</div>
+			<div slot="footer">
+				<Button type="text" size="large" @click="handleModalCancel">取消</Button>
+				<Button class="btn2" type="success" size="large" icon="md-cloud-upload" @click="upload"
+						:loading="loadingStatus"
+				>{{ loadingStatus ? '文件上传中 请稍后...' : '上传' }}
+				</Button>
+			</div>
+		</Modal>
+	</div>
+</template>
+<script>
+	import qfTransfer from '../components/qf-transfer/qf-transfer'
+
+	export default {
+		name: 'fire-linkage-config',
+		components: {
+			qfTransfer
+		},
+		props: {},
+		data() {
+			return {
+				isAllFlag: false,
+				allCount: 0,
+				targetKeys3: [],
+				videoAllList: [],
+				listStyle: {
+					width: '300px',
+					height: '300px'
+				},
+				axios: this.$api.svgConfig,
+				treeData: [],
+				formInline: {
+					linkStat: '0',
+					svgStat: '0'
+				},
+				unitId: '',
+				orgId: '',
+				isTree: false,
+				isFile: false,
+				stationName: '',
+				modalShow: false,
+				step: 0,
+				file: null,
+				loadingStatus: false,
+				accept: '.gif',
+				Format: ['.gif'],
+				tableColumns: [
+					{
+						title: '站点名称',
+						key: 'nodeName',
+						width: 160,
+						align: 'center'
+					},
+					{
+						title: '设备名称',
+						key: 'DevTypeName',
+						align: 'center'
+					},
+					{
+						title: 'svg配置状态',
+						key: 'svgStat',
+						align: 'center'
+					},
+					{
+						title: '视频配置状态',
+						key: 'linkStat',
+						align: 'center'
+					}
+					// {
+					// 	title: '操作',
+					//
+					// 	key: 'action',
+					// 	align: 'center',
+					//
+					// 	render: (h, params) => {
+					// 		return h('div', [
+					// 			h(
+					// 				'Button',
+					// 				{
+					// 					props: {
+					// 						type: 'error',
+					// 						icon: 'md-trash'
+					// 					},
+					// 					on: {
+					// 						click: () => {
+					// 							this.handleRemove(params)
+					// 						}
+					// 					}
+					// 				},
+					// 				'删除'
+					// 			)
+					// 		])
+					// 	}
+					// }
+				],
+				// 搜索下拉框
+				typeList: [
+					{
+						code: '0',
+						name: '未配置'
+					},
+					{
+						code: '1',
+						name: '已配置'
+					}
+				],
+				tableData: [],
+				// 分页信息
+				total: 10,
+				page: 1,
+				pageSize: 20
+			}
+		},
+		computed: {},
+		filters: {},
+		watch: {
+			modalShow(val) {
+				if (!val) {
+					this.file = null
+					this.isFile = false
+					this.loadingStatus = false
+					this.step = 0
+				}
+			}
+		},
+		created() {
+			this.getStationTree()
+		},
+		mounted() {
+		},
+		activited() {
+		},
+		update() {
+		},
+		beforeDestory() {
+		},
+		methods: {
+			// 点击表格查询配置信息
+			showRowData(row, index) {
+				console.log(row)
+				let params = {
+					unitId: this.unitId,
+					nodeId: row.nodeId,
+					nodeGUID: row.nodeGUID,
+					devId: row.devId
+				}
+				this.$api.linkageConfig.getRowData(params).then(res => {
+					console.log(res)
+					let idList=[]
+					if(res.data.preset.length>0){
+						res.data.preset.forEach(item =>{
+							idList.push(item.Id)
+						})
+						this.$refs.qfTransfer.setCheckedKey(idList)
+					}
+
+
+				})
+			},
+			// 查询状态改变重新渲染列表
+			statChange(value) {
+				let that = this
+				setTimeout(() => {
+					that.getTable()
+				}, 500)
+			},
+			returnThis() {
+				return this
+			},
+			_forEach: function (data, isTrue, callback) {
+				var arr = []
+				for (var i = 0; i < data.length; i++) {
+					arr.push(data[i])
+				}
+				while (arr.length) {
+					var _p = arr.shift()
+					if (callback(_p) == false) {
+						return
+					}
+					if (isTrue && _p.children) {
+						for (var j = _p.children.length - 1; j >= 0; j--) {
+							arr.unshift(_p.children[j])
+						}
+					}
+				}
+			},
+			// 获取站点树
+			async getStationTree() {
+				let result = await this.axios.getUnitTree({ iFlag: 2 })
+				if (result.code == 200) {
+					this._forEach(result.data, true, item => {
+						item.expand = true
+					})
+					this.treeData = result.data
+				}
+			},
+			// 站点树点击事件
+			handleStationTree(data) {
+				if (data[0].flag == 0) {
+					// 如果不是变电站
+					this.unitId = ''
+					this.orgId = data[0].id
+					this.isTree = false // 新增不能点击
+				} else {
+					// 是变电站
+					this.unitId = data[0].id
+					this.orgId = ''
+					this.isTree = true
+				}
+				this.videoAllList = this.getMockData()
+				this.$refs.qfTransfer.clearList()
+				this.stationName = data[0].title
+				this.getTable()
+			},
+			// 文件上传弹窗点击
+			handleUploadBtn() {
+				if (this.isTree) {
+					this.modalShow = true
+				} else {
+					this.$Message.warning('请选择左侧变电站')
+				}
+			},
+			// 选择文件
+			handleUpload(file) {
+				// 添加文件
+				this.file = file
+				this.step = 1
+				this.isFile = true
+				return false
+			},
+			// 移除文件
+			removeFile() {
+				this.file = null
+				this.step = 0
+				this.isFile = false
+			},
+			// 上传提交
+			upload() {
+				// 点击上传
+				if (this.isFile) {
+					if (this.file.name.substring(this.file.name.length - 3) == 'svg' || this.file.name.substring(this.file.name.length - 3) == 'SVG') {
+						this.loadingStatus = true
+						this.step = 2
+						let params = new FormData() // 创建form对象
+						params.append('svgfile', this.file) // 通过append向form对象添加数据
+						params.append('unitID', this.unitId) // 添加变电站id
+						let config = {
+							header: { 'Content-Type': 'multipart/form-data' }
+						}
+						this.axios.uploadSvg(params, config).then(res => {
+							if (res.code == 200) {
+								this.file = null
+								this.loadingStatus = false
+								this.$Message.success({ duration: 3, content: '文件上传成功' })
+								this.modalShow = false
+								this.getTable()
+								this.step = 1
+							} else {
+								this.$Message.error(res.msg)
+							}
+						})
+					} else {
+						this.file = null
+						this.isFile = false
+						this.step = 0
+						this.$Message.warning('请选择.svg格式的文件')
+					}
+				} else {
+					this.$Message.warning('请选择需要上传的文件')
+				}
+			},
+			// 弹窗取消
+			handleModalCancel() {
+				this.modalShow = false
+			},
+			// 获取图片列表
+			getTable() {
+				let params = {
+					unitId: this.unitId,
+					currentPage: this.page,
+					svgStat: this.formInline.svgStat,
+					linkStat: this.formInline.linkStat,
+					pageSize: this.pageSize
+				}
+				this.$api.linkageConfig.getConfigAreaList(params).then(res => {
+					console.log(res)
+					this.tableData = res.data.list
+					this.total = res.data.total
+				})
+			},
+			// 分页切换
+			handleChangePage(page) {
+				this.page = page
+				this.getTable()
+			},
+			// 分页条数
+			handleChangePageSize(pageSize) {
+				this.pageSize = pageSize
+				this.getTable()
+			},
+			// 渲染穿梭框
+			getMockData() {
+				let mockData = [], num = 0
+				this.$api.linkageConfig
+					.getVideoList({
+						unitId: '8177a787a28b4f86a103fac9a023db05',
+						actionType: 0,
+						subSystemId: 1009,
+						treeType: 5,
+						type: 0
+					})
+					.then(res => {
+						this.targetKeys3 = []
+						if (res.data && res.data.length > 0) {
+							console.log(res)
+							res.data[0].children[0].children.forEach(item => {
+								if (item.children) {
+									item.children.forEach(i => {
+										i.label = i.title
+										i.key = i.id
+									})
+								}
+								mockData.push({
+									key: item.id,
+									label: item.title,
+									children: item.children
+								})
+							})
+
+							// this.videoAllList = res.data.lists
+						}
+					})
+				return mockData
+			}
+		},
+		beforeRouteEnter(to, from, next) {
+			next()
+		},
+		beforeRouteUpdate(to, from, next) {
+			next()
+		},
+		beforeRouteLeave(to, from, next) {
+			next()
+		}
+	}
+</script>
+<style lang="stylus" scoped>
+	.title {
+
+	}
+
+	.fire-linkage-config {
+		width: 100%;
+		// height: calc(100vh - 160px);
+
+		.left-tree {
+			width: 230px;
+			height: calc(100vh - 150px);
+			background-color: #fff;
+			border: 10px solid #fff;
+			overflow: auto;
+			float: left;
+		}
+
+		.right-content {
+			width: calc(100% - 1000px);
+			height: 100%;
+			float: left;
+			margin-left: 10px;
+			display: flex;
+			flex-direction: column;
+
+			.tool-bar {
+				.btn-box {
+					.ivu-btn {
+						margin-right: 10px;
+					}
+				}
+			}
+
+			.table-content {
+				width: 100%;
+				// flex: 1;
+				// position: relative;
+
+				/deep/ .ivu-table-wrapper {
+					height: calc(100vh - 210px) !important;
+
+					.ivu-table-body,
+					.ivu-table-overflowY,
+					.ivu-table-tip,
+					.ivu-table-tip td {
+						height: calc(100vh - 250px) !important;
+					}
+				}
+
+				// /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+				// 	height: calc(100% - 40px) !important;
+				// }
+
+				/deep/ .ivu-table {
+					p {
+						color: #19be6b;
+					}
+
+					b {
+						font-weight: 400;
+						color: #ff9900;
+					}
+
+					i {
+						font-style: normal;
+					}
+				}
+
+				/deep/ tr.ivu-table-row-hover td {
+					background-color: #F5F7FA;
+				}
+
+				/deep/ .ivu-btn {
+					font-size: 14px;
+				}
+
+				.table-page {
+					width: 100%;
+					position: absolute;
+					left 50%
+
+					.page-content {
+						width: 800px;
+						transform: translateX(-50%);
+					}
+				}
+			}
+		}
+
+		.right-end {
+			width: 33.4444rem
+			float: left;
+			padding-left 6px
+
+			.transfer {
+
+			}
+
+			.source {
+				.source-header {
+
+				}
+
+				.source-content {
+					border 1px solid #cccccc
+					padding 20px
+
+					.card {
+						width 200px
+						height 200px
+						border 1px solid #cccccc
+						text-align center
+						line-height 200px
+						font-size xx-large
+
+					}
+				}
+
+				.source-content {
+
+				}
+
+			}
+
+		}
+	}
+
+	.upload-content {
+		width: 100%;
+		height: 100%;
+		position: relative;
+
+		.steps {
+			margin-left: 30px;
+			margin-bottom: 30px;
+		}
+
+		.up-box {
+			margin-left: 50px;
+			font-size: 16px;
+			color: #515a6e;
+			margin-top: 30px;
+
+			span {
+				font-size: 16px;
+				margin-top: 10px;
+				color: #464c5b;
+				font-weight: 700;
+				display: block;
+
+				.del {
+					float: left;
+					display: inline-block;
+					width: 30px;
+					text-align: center;
+					font-size: 18px;
+					line-height: 100%;
+					color: #2b85e4;
+					cursor: pointer;
+
+					&:hover {
+						color: #ed4014;
+					}
+				}
+			}
+		}
+
+		.btn1 {
+			width: 400px;
+			margin: 10px 10px 10px 50px;
+		}
+	}
+</style>

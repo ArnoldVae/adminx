@@ -1,0 +1,324 @@
+{
+  "modified": "Thu Aug 29 2019 17:20:25 GMT+0800 (中国标准时间)",
+  "dataBindings": [
+    {
+      "attr": "1003.0011",
+      "valueType": "String",
+      "name": "计数器动作次数"
+    },
+    {
+      "attr": "1003.0008",
+      "valueType": "String",
+      "name": "阻性电流"
+    },
+    {
+      "attr": "1003.0007",
+      "valueType": "String",
+      "name": "全电流"
+    }
+  ],
+  "width": 500,
+  "height": 200,
+  "comps": [
+    {
+      "type": "rect",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "rect": [
+        0,
+        0,
+        500,
+        200
+      ]
+    },
+    {
+      "type": "roundRect",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "rect": [
+        37.31524,
+        49.11616,
+        146,
+        100
+      ]
+    },
+    {
+      "type": "shape",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "points": [
+        37.32589,
+        99.27509,
+        182.62245,
+        99.95723,
+        183.30459,
+        99.27509,
+        183.30459,
+        99.27509
+      ],
+      "segments": [
+        1,
+        4
+      ]
+    },
+    {
+      "type": "roundRect",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "rect": [
+        193.30459,
+        49.11616,
+        146,
+        100
+      ]
+    },
+    {
+      "type": "shape",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "points": [
+        193.4608,
+        99.27509,
+        338.75736,
+        99.95723,
+        339.4395,
+        99.27509,
+        339.4395,
+        99.27509
+      ],
+      "segments": [
+        1,
+        4
+      ]
+    },
+    {
+      "type": "roundRect",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "rect": [
+        349.45015,
+        49.11616,
+        146,
+        100
+      ]
+    },
+    {
+      "type": "shape",
+      "borderWidth": 1,
+      "borderColor": "rgb(50,153,255)",
+      "points": [
+        350.0213,
+        99.77509,
+        495.31786,
+        100.45723,
+        496,
+        99.77509,
+        496,
+        99.77509
+      ],
+      "segments": [
+        1,
+        4
+      ]
+    },
+    {
+      "type": "text",
+      "text": "计数器动作次数",
+      "align": "center",
+      "color": "rgb(247,247,247)",
+      "font": "15px arial, sans-serif",
+      "rect": [
+        37.32589,
+        50,
+        110.90643,
+        50
+      ]
+    },
+    {
+      "type": "image",
+      "name": "symbols/zf/history.png",
+      "prefix": "1003.0008",
+      "displayName": "1003.0008",
+      "rect": [
+        303.45015,
+        59.11616,
+        30,
+        30
+      ],
+      "onClick": "__ht__function(event, data, view, point, width, height) {\nhtModel(data, '1003.0008')\n}"
+    },
+    {
+      "type": "text",
+      "text": "阻性电流",
+      "align": "center",
+      "color": "rgb(247,247,247)",
+      "font": "15px arial, sans-serif",
+      "rect": [
+        193.15519,
+        49.11616,
+        108.92161,
+        50
+      ]
+    },
+    {
+      "type": "text",
+      "text": "全电流",
+      "align": "center",
+      "color": "rgb(247,247,247)",
+      "font": "15px arial, sans-serif",
+      "rect": [
+        349.0213,
+        50,
+        108.92161,
+        50
+      ]
+    },
+    {
+      "type": "image",
+      "name": "symbols/zf/history.png",
+      "prefix": "1003.0011",
+      "displayName": "1003.0011",
+      "rect": [
+        148.23232,
+        60,
+        30,
+        30
+      ],
+      "onClick": "__ht__function(event, data, view, point, width, height) {\nhtModel(data, '1003.0011')\n}"
+    },
+    {
+      "type": "image",
+      "name": "symbols/zf/history.png",
+      "prefix": "1003.0007",
+      "displayName": "1003.0007",
+      "rect": [
+        459.94292,
+        60.11616,
+        30,
+        30
+      ],
+      "onClick": "__ht__function(event, data, view, point, width, height) {\nhtModel(data, '1003.0007')\n}"
+    },
+    {
+      "type": "text",
+      "text": "值(次)",
+      "align": "center",
+      "color": "rgb(247,247,247)",
+      "rect": [
+        37.55788,
+        100,
+        72.76801,
+        50
+      ]
+    },
+    {
+      "type": "text",
+      "text": "值(mA)",
+      "align": "center",
+      "color": "rgb(247,247,247)",
+      "rect": [
+        193.15519,
+        99.61616,
+        72.76801,
+        50
+      ]
+    },
+    {
+      "type": "text",
+      "text": "值(mA)",
+      "align": "center",
+      "color": "rgb(247,247,247)",
+      "rect": [
+        349,
+        100,
+        72.76801,
+        50
+      ]
+    },
+    {
+      "type": "rect",
+      "background": "rgb(61,61,61)",
+      "borderWidth": 1,
+      "borderColor": "#979797",
+      "displayName": "矩形",
+      "rect": [
+        109.31524,
+        110,
+        68,
+        30
+      ]
+    },
+    {
+      "type": "rect",
+      "background": "rgb(61,61,61)",
+      "borderWidth": 1,
+      "borderColor": "#979797",
+      "rect": [
+        265.45015,
+        107.11616,
+        68,
+        30
+      ]
+    },
+    {
+      "type": "rect",
+      "background": "rgb(61,61,61)",
+      "borderWidth": 1,
+      "borderColor": "#979797",
+      "rect": [
+        421.01065,
+        110.11616,
+        68,
+        30
+      ]
+    },
+    {
+      "type": "text",
+      "text": {
+        "func": "attr@1003.0011",
+        "value": "0"
+      },
+      "align": "center",
+      "color": "rgb(0,255,94)",
+      "font": "16px Microsoft YaHei",
+      "rect": [
+        114.31524,
+        115,
+        58,
+        24
+      ]
+    },
+    {
+      "type": "text",
+      "text": {
+        "func": "attr@1003.0008",
+        "value": "0"
+      },
+      "align": "center",
+      "color": "rgb(0,255,94)",
+      "font": "16px Microsoft YaHei",
+      "rect": [
+        270.45015,
+        112.11616,
+        58,
+        24
+      ]
+    },
+    {
+      "type": "text",
+      "text": {
+        "func": "attr@1003.0007",
+        "value": "0"
+      },
+      "align": "center",
+      "color": "rgb(0,255,94)",
+      "font": "16px Microsoft YaHei",
+      "rect": [
+        426.01065,
+        115.11616,
+        58,
+        24
+      ]
+    }
+  ]
+}

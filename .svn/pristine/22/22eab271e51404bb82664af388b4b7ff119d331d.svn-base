@@ -1,0 +1,510 @@
+<template>
+  <div class="subsystem"
+       ref="subsystem">
+    <!-- 头 -->
+    <searche-header-wrapper ref="searche-header-wrapper">
+      <!-- <form-item type="text"
+                 v-model="params.vcName"
+                 noMBottom></form-item>
+
+      <is-enabler-select v-model="params.subStatus"
+                         noMBottom></is-enabler-select>
+
+      <com-button type="search"
+                  @click="tableLoad"></com-button>
+      <com-button type="reset"></com-button>-->
+      <com-button size="large"
+                  type="add"
+                  @click="subsystemModal.set(true, 'add', '新增子系统')"></com-button>
+    </searche-header-wrapper>
+
+    <!-- 表格 -->
+    <div class="table-main">
+      <element-table :columns="columns"
+                     :data="tableData"
+                     border
+                     :height="contentHeight"></element-table>
+
+      <Page style="margin-top: 10px;"
+            :total="pageConfig.total"
+            :current="pageConfig.page"
+            :page-size="pageConfig.pageSize"
+            show-sizer
+            show-elevator
+            show-total
+            @on-change="PageChangeHandler('page', $event)"
+            @on-page-size-change="PageChangeHandler('pageSize', $event)" />
+    </div>
+
+    <!-- 弹框 -->
+    <Modal v-model="subsystemModal.show"
+           :title="subsystemModal.title"
+           :mask-closable="false">
+      <!-- add & edit Form -->
+      <template v-if="subsystemModal.type == 'add' || subsystemModal.type == 'edit'">
+        <com-form ref="subsystem-info-form"
+                  v-model="subsystemForm"
+                  :items="subsystemFormItems"></com-form>
+      </template>
+
+      <template v-else>
+        <div class="tree-wrapper">
+          <div>
+            <el-input placeholder="输入关键字进行过滤"
+                      v-model="filterText"></el-input>
+            <el-tree ref="equ-type-list-tree"
+                     node-key="id"
+                     :data="equTypeList"
+                     :props="{ label: 'vcName' }"
+                     empty-text="暂无数据"
+                     show-checkbox
+                     check-strictly
+                     check-on-click-node
+                     :filter-node-method="filterNode"></el-tree>
+          </div>
+        </div>
+      </template>
+
+      <modal-footer slot="footer"
+                    @on-cancel="subsystemModal.set(false)"
+                    @on-confirm="handleModalConfirm(subsystemModal.type, 'subsystem-info-form')"></modal-footer>
+    </Modal>
+  </div>
+</template>
+<script>
+import { ModalConfig, PageConfig } from '@/libs/construction'
+import elementTable from '_b/element-table'
+import mixinTolls from '@common/mixin/tools'
+import deviceMixin from '../device-mixins'
+export default {
+	name: 'subsystem',
+	mixins: [mixinTolls, deviceMixin],
+	components: {
+		elementTable
+	},
+	props: {},
+	data() {
+		const renderOperation = (h, params) => {
+			let row = params.row
+			return h('div', [
+				h('com-button', {
+					attrs: {
+						type: 'edit',
+						size: 'large'
+					},
+					on: {
+						click: () => {
+							let targetIndex = this.getTargetIndexByKey(this.subsystemFormItems, 'prop', 'subSystemId')
+							this.subsystemFormItems[targetIndex].disabled = true
+
+							this.setFormBySource(this.subsystemForm, row)
+							this.subsystemModal.set(true, 'edit', '编辑子系统')
+						}
+					}
+				}),
+				h('com-button', {
+					attrs: {
+						type: 'delete',
+						size: 'large'
+					},
+					on: {
+						click: () => {
+							this.$Modal.confirm({
+								title: '确认',
+								content: `<p>是否确认删除所选子系统</p>`,
+								onOk: () => {
+									let params = {
+										subSystemId: row.subSystemId
+									}
+									this.http.deleteSubsystem(params).then(res => {
+										if (res.code == '200') {
+											this.$Message.success(`删除成功`)
+											this.tableLoad()
+										} else {
+											this.$Message.warning(res.msg)
+										}
+									})
+								}
+							})
+						}
+					}
+				}),
+				h(
+					'com-button',
+					{
+						attrs: {
+							type: 'confirm',
+							size: 'large',
+							icon: 'ios-browsers-outline'
+						},
+						on: {
+							click: () => {
+								this.handleRelevancyEquType(row)
+							}
+						}
+					},
+					'关联模型类型'
+				)
+			])
+		}
+		return {
+			http: this.$api.subsystem,
+			enums: null,
+			getComHeightMain: null,
+
+			// 分页
+			pageConfig: new PageConfig(),
+
+			// 搜索条件
+			params: {
+				vcName: '',
+				subStatus: 'all'
+			},
+			// 弹框
+			subsystemModal: new ModalConfig(),
+			subsystemForm: {
+				subSystemId: '',
+				vcName: '',
+				type: '0',
+				visible: '1',
+				isEnable: '1',
+				sort: 0,
+				vcMemo: ''
+			},
+			subsystemFormItems: [
+				{
+					label: '名称',
+					prop: 'vcName',
+					rules: [
+						{ required: true, message: '该项为必填项', trigger: 'change' },
+						{ pattern: /^.{0,255}$/, message: '最多输入256字', trigger: 'change' }
+					]
+				},
+				{
+					label: '子系统ID',
+					prop: 'subSystemId',
+					rules: [
+						{ required: true, message: '该项为必填项', trigger: 'change' },
+						{ pattern: /^[0-9]\d*$/, message: '请正确输入数字ID', trigger: 'change' },
+						{ pattern: /^.{0,9}$/, message: '最多输入9位', trigger: 'change' }
+					],
+					disabled: false
+				},
+				{
+					label: '所属业务类型',
+					prop: 'type',
+					type: 'select',
+					options: [],
+					setings: { value: 'dictID', label: 'vcName' },
+					rules: [{ required: true, message: '该项为必选项', trigger: 'change' }]
+				},
+				{
+					label: '排序',
+					prop: 'sort',
+					rules: [
+						{ pattern: /^[0-9]\d*$/, message: '请正确输入数字排序', trigger: 'change' },
+						{ pattern: /^.{0,9}$/, message: '最多输入9位', trigger: 'change' }
+					]
+				},
+				{
+					label: '是否可见',
+					prop: 'visible',
+					type: 'radio',
+					options: [
+						{
+							value: '1',
+							label: '显示'
+						},
+						{
+							value: '0',
+							label: '隐藏'
+						}
+					],
+					rules: [{ required: true, message: '该项为必选项', trigger: 'change' }]
+				},
+				{
+					label: '是否启用',
+					prop: 'isEnable',
+					type: 'radio',
+					options: [
+						{
+							value: '1',
+							label: '启用'
+						},
+						{
+							value: '0',
+							label: '禁用'
+						}
+					],
+					rules: [{ required: true, message: '该项为必选项', trigger: 'change' }]
+				}
+			],
+
+			// 表格
+			columns: [
+				{ label: '子系统', prop: 'vcName' },
+				{ label: '子系统ID', prop: 'subSystemId' },
+				{ label: '所属业务类型', prop: 'typeHtml' },
+				{ label: '排序', prop: 'sort', width: 140 },
+				{ label: '是否可见', prop: 'visibleHtml', width: 140 },
+				{ label: '状态', prop: 'isEnableHtml', width: 140 },
+				{ label: '操作', prop: 'operation', width: 390, render: renderOperation }
+			],
+			tableData: [],
+			// 设备列表
+			filterText: '',
+			equTypeList: [],
+			currentSubsystem: null
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		'subsystemModal.show'(newVal) {
+			if (!newVal) {
+				if (this.subsystemModal.type == 'add' || this.subsystemModal.type == 'edit') {
+					let obj = {
+						type: '0',
+						visible: '1',
+						isEnable: '1',
+						sort: '0'
+					}
+					this.resetComForm(this.subsystemForm, obj, 'subsystem-info-form')
+
+					// 初始化 id 的禁用状态
+					let targetIndex = this.getTargetIndexByKey(this.subsystemFormItems, 'prop', 'subSystemId')
+					this.subsystemFormItems[targetIndex].disabled = false
+				} else {
+					this.handleSetCheckedKeys('equ-type-list-tree', [])
+				}
+			} else {
+				if (this.subsystemModal.type == 'add') {
+					this.subsystemForm.type = this.enums[0].dictID
+				}
+			}
+		},
+		'params.subStatus'(newVal) {
+			this.tableLoad()
+		},
+		filterText(newVal) {
+			this.$refs['equ-type-list-tree'].filter(newVal)
+		}
+	},
+	created() {
+		// 初始化
+		this.init()
+	},
+	mounted() {
+		//  监听窗口变化
+		this.getComHeightMain = this.getComHeight('subsystem', 'searche-header-wrapper')
+		this.$nextTick(() => {
+			this.getComHeightMain()
+		})
+		window.addEventListener('resize', this.getComHeightMain)
+	},
+	activited() {},
+	update() {},
+	beforeDestroy() {},
+	methods: {
+		// 初始化
+		init() {
+			// 获取所有设备类型
+			this.getAllDevTypeList()
+
+			// 获取本地 定义的枚举 数据
+			// this.$api.getLocalData('enums.json').then(res => {
+			// this.enums = res.data
+
+			// 	let targetIndex = this.getTargetIndexByKey(this.subsystemFormItems, 'prop', 'type')
+			// 	this.subsystemFormItems[targetIndex].options = this.enums.subsystemType
+
+			// 	// 表格加载
+			// 	this.tableLoad()
+			// })
+			this.http.findDicList({ dictGroupID: 1006 }).then(res => {
+				if (res.code == 200 && res.data) {
+					console.log(res)
+					this.enums = res.data
+					this.enums.forEach(item => {
+						for (let k in item) {
+							item[k] = item[k] + ''
+						}
+					})
+					let targetIndex = this.getTargetIndexByKey(this.subsystemFormItems, 'prop', 'type')
+					console.log(this.enums)
+					this.subsystemFormItems[targetIndex].options = this.enums
+
+					// // 表格加载
+					this.tableLoad()
+				}
+			})
+		},
+
+		// 获取子系统列表
+		tableLoad() {
+			let params = {
+				currentPage: this.pageConfig.page,
+				pageSize: this.pageConfig.pageSize
+				// vcName: this.params.vcName,
+				// isEnable: this.params.subStatus == 'all' ? '' : this.params.subStatus - 0
+			}
+
+			this.http.getSubstystemList(params).then(res => {
+				if (res.code == '200') {
+					let data = res.data
+					this.$set(this.pageConfig, 'total', data.page.totalNum)
+					this.tableData = data.lists.map(item => {
+						let subsystemType = this.enums
+						let targetIndex = subsystemType.findIndex(subI => subI.dictID == item['type'])
+						if (targetIndex != -1) item['typeHtml'] = subsystemType[targetIndex].vcName
+
+						item['visibleHtml'] =
+							item['visible'] == 1 ? this.returnHtmlString('span', '显示', '#19be6b') : this.returnHtmlString('span', '隐藏', '#ff9900')
+						item['isEnableHtml'] =
+							item['isEnable'] == 1 ? this.returnHtmlString('span', '启用', '#19be6b') : this.returnHtmlString('span', '禁用', '#ff9900')
+						item['type'] = `${item['type']}`
+						item['isEnable'] = `${item['isEnable']}`
+						item['visible'] = `${item['visible']}`
+
+						return item
+					})
+				}
+			})
+		},
+		// 获取所有的设备类型
+		getAllDevTypeList() {
+			let params = {
+				// currentPage: 1,
+				// pageSize: 5000
+				isPage: 0
+			}
+			this.http.getAllDevTypeList(params).then(res => {
+				if (res.code == '200') {
+					this.equTypeList = res.data.lists.map(item => {
+						item['id'] = item.devTypeId
+						return item
+					})
+				}
+			})
+		},
+
+		// 弹框确认  新增  || 修改
+		handleModalConfirm(type, name) {
+			if (type == 'linkEquType') {
+				let params = {
+					subSystemId: this.currentSubsystem.subSystemId,
+					devTypeIds: this.$refs['equ-type-list-tree'].getCheckedKeys()
+				}
+
+				this.http
+					.subsRelevancyEquType(params)
+					.then(res => {
+						if (res.code == '200') {
+							this.$Message.success('关联成功')
+							this.subsystemModal.set(false)
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+					.catch(err => {
+						this.$Message.error(`错误：${err}`)
+					})
+			} else {
+				this.validateComForm(name, () => {
+					let params = { ...this.subsystemForm }
+					let requestType = ''
+					let text = ''
+					type == 'add' ? ((requestType = 'addSubsystem'), (text = '添加')) : ((requestType = 'updateSubsystem'), (text = '修改'))
+
+					// console.log(text, '-params- ', params)
+
+					this.http[requestType](params).then(res => {
+						if (res.code == '200') {
+							this.$Message.success(`${text}成功`)
+							this.tableLoad()
+							this.subsystemModal.set(false)
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+				})
+			}
+		},
+
+		// 点击 关联设备类型的 操作
+		handleRelevancyEquType(row) {
+			if (!this.equTypeList.length) {
+				this.$Message.error('暂无模型类型可选')
+				return
+			}
+
+			this.currentSubsystem = row
+
+			let params = {
+				subSystemId: row.subSystemId
+			}
+			this.http.getSubsystemEquType(params).then(res => {
+				if (res.code == '200') {
+					this.subsystemModal.set(true, 'linkEquType', '关联模型类型')
+					// console.log(res)
+					let arr = res.data.map(item => {
+						return item.devTypeId
+					})
+
+					this.$nextTick(() => {
+						this.handleSetCheckedKeys('equ-type-list-tree', arr)
+					})
+				} else {
+					this.$Message.warning('获取关联的模型类型失败')
+				}
+			})
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		window.removeEventListener('resize', this.getComHeightMain)
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.subsystem {
+  height: 100%;
+
+  /deep/ .table-main {
+    .ivu-page {
+      flex-align(center);
+    }
+  }
+}
+
+.tree-wrapper {
+  height: 400px;
+  position: relative;
+
+  > div {
+    height: 100%;
+    overflow-y: auto;
+    padding-top: 36px;
+  }
+
+  /deep/ .el-input {
+    position: absolute;
+    top: 0;
+    z-index: 99;
+
+    .el-input__inner {
+      height: 34px;
+    }
+  }
+}
+
+.table-main {
+  height: calc(100vh - 220px);
+}
+</style>

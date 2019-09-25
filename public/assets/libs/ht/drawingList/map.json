@@ -1,0 +1,875 @@
+{
+  "v": "7.0.1",
+  "p": {
+    "background": "none",
+    "autoAdjustIndex": true,
+    "hierarchicalRendering": true
+  },
+  "a": {
+    "rotateAsClock": false,
+    "connectActionType": null,
+    "fitContent": true,
+    "rectSelectable": false
+  },
+  "d": [
+    {
+      "c": "ht.Node",
+      "i": 8788,
+      "p": {
+        "position": {
+          "x": 20.44457,
+          "y": 67.47987
+        },
+        "width": 39.91807,
+        "height": 131.66117
+      },
+      "s": {
+        "shape": "roundRect",
+        "shape.background": "rgb(51,153,255)",
+        "shape.border.width": 1,
+        "shape.border.color": "#979797",
+        "2d.selectable": false
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8789,
+      "p": {
+        "position": {
+          "x": 22.24959,
+          "y": 13.74408
+        },
+        "width": 36.25318,
+        "height": 99.42704
+      },
+      "s": {
+        "text": "1号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8790,
+      "p": {
+        "position": {
+          "x": 54.123,
+          "y": 28.64929
+        }
+      },
+      "s": {
+        "text": "主变",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8791,
+      "p": {
+        "position": {
+          "x": 54.15042,
+          "y": 45.05912
+        }
+      },
+      "s": {
+        "text": "C相",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8792,
+      "p": {
+        "position": {
+          "x": 54.123,
+          "y": 61.45759
+        }
+      },
+      "s": {
+        "text": "感温",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8793,
+      "p": {
+        "position": {
+          "x": 54.15042,
+          "y": 78.05912
+        }
+      },
+      "s": {
+        "text": "电缆",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8794,
+      "p": {
+        "position": {
+          "x": 54.48553,
+          "y": 92.47987
+        }
+      },
+      "s": {
+        "text": "1报",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8795,
+      "p": {
+        "position": {
+          "x": 55.15042,
+          "y": 109.50126
+        }
+      },
+      "s": {
+        "text": "警",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8796,
+      "p": {
+        "position": {
+          "x": 105.48553,
+          "y": 67.47987
+        },
+        "width": 39.91807,
+        "height": 131.66117
+      },
+      "s": {
+        "shape": "roundRect",
+        "shape.background": "rgb(51,153,255)",
+        "shape.border.width": 1,
+        "shape.border.color": "#979797",
+        "2d.selectable": false
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8797,
+      "p": {
+        "position": {
+          "x": 185.74437,
+          "y": 67.47987
+        },
+        "width": 39.91807,
+        "height": 131.66117
+      },
+      "s": {
+        "shape": "roundRect",
+        "shape.background": "rgb(51,153,255)",
+        "shape.border.width": 1,
+        "shape.border.color": "#979797",
+        "2d.selectable": false
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8798,
+      "p": {
+        "position": {
+          "x": 507.68003,
+          "y": 67.47987
+        },
+        "width": 39.91807,
+        "height": 131.66117
+      },
+      "s": {
+        "shape": "roundRect",
+        "shape.background": "rgb(51,153,255)",
+        "shape.border.width": 1,
+        "shape.border.color": "#979797",
+        "2d.selectable": false
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8799,
+      "p": {
+        "position": {
+          "x": 427.9294,
+          "y": 67.47987
+        },
+        "width": 39.91807,
+        "height": 131.66117
+      },
+      "s": {
+        "shape": "roundRect",
+        "shape.background": "rgb(51,153,255)",
+        "shape.border.width": 1,
+        "shape.border.color": "#979797",
+        "2d.selectable": false
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8800,
+      "p": {
+        "position": {
+          "x": 353.6761,
+          "y": 67.47987
+        },
+        "width": 39.91807,
+        "height": 131.66117
+      },
+      "s": {
+        "shape": "roundRect",
+        "shape.background": "rgb(51,153,255)",
+        "shape.border.width": 1,
+        "shape.border.color": "#979797",
+        "2d.selectable": false
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8801,
+      "p": {
+        "position": {
+          "x": 273.00925,
+          "y": 67.47987
+        },
+        "width": 39.91807,
+        "height": 131.66117
+      },
+      "s": {
+        "shape": "roundRect",
+        "shape.background": "rgb(51,153,255)",
+        "shape.border.width": 1,
+        "shape.border.color": "#979797",
+        "2d.selectable": false
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8802,
+      "p": {
+        "position": {
+          "x": 107.31798,
+          "y": 15.01049
+        },
+        "width": 36.25318,
+        "height": 99.42704
+      },
+      "s": {
+        "text": "1号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8803,
+      "p": {
+        "position": {
+          "x": 187.57682,
+          "y": 15.01049
+        },
+        "width": 36.25318,
+        "height": 99.42704
+      },
+      "s": {
+        "text": "1号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8804,
+      "p": {
+        "position": {
+          "x": 273.00925,
+          "y": 15.01049
+        },
+        "width": 36.25318,
+        "height": 99.42704
+      },
+      "s": {
+        "text": "1号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8805,
+      "p": {
+        "position": {
+          "x": 355.50855,
+          "y": 15.01049
+        },
+        "width": 36.25318,
+        "height": 99.42704
+      },
+      "s": {
+        "text": "1号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8806,
+      "p": {
+        "position": {
+          "x": 429.76184,
+          "y": 15.01049
+        },
+        "width": 36.25318,
+        "height": 99.42704
+      },
+      "s": {
+        "text": "1号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8807,
+      "p": {
+        "position": {
+          "x": 509.51247,
+          "y": 15.01049
+        },
+        "width": 36.25318,
+        "height": 99.42704
+      },
+      "s": {
+        "text": "1号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8808,
+      "p": {
+        "position": {
+          "x": 139.19139,
+          "y": 28.64929
+        }
+      },
+      "s": {
+        "text": "主变",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8809,
+      "p": {
+        "position": {
+          "x": 304.88266,
+          "y": 28.64929
+        }
+      },
+      "s": {
+        "text": "主变",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8810,
+      "p": {
+        "position": {
+          "x": 387.38196,
+          "y": 28.05912
+        }
+      },
+      "s": {
+        "text": "主变",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8811,
+      "p": {
+        "position": {
+          "x": 461.63525,
+          "y": 28.05912
+        }
+      },
+      "s": {
+        "text": "主变",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8812,
+      "p": {
+        "position": {
+          "x": 541.38588,
+          "y": 28.64929
+        }
+      },
+      "s": {
+        "text": "主变",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8813,
+      "p": {
+        "position": {
+          "x": 139.19139,
+          "y": 45.05912
+        }
+      },
+      "s": {
+        "text": "C相",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8814,
+      "p": {
+        "position": {
+          "x": 305.50855,
+          "y": 46.05912
+        }
+      },
+      "s": {
+        "text": "C相",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8815,
+      "p": {
+        "position": {
+          "x": 387.38196,
+          "y": 45.05912
+        }
+      },
+      "s": {
+        "text": "C相",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8816,
+      "p": {
+        "position": {
+          "x": 461.84226,
+          "y": 44.47987
+        }
+      },
+      "s": {
+        "text": "C相",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8817,
+      "p": {
+        "position": {
+          "x": 541.38588,
+          "y": 46.05912
+        }
+      },
+      "s": {
+        "text": "C相",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8818,
+      "p": {
+        "position": {
+          "x": 137.57682,
+          "y": 61.05912
+        }
+      },
+      "s": {
+        "text": "感温",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8819,
+      "p": {
+        "position": {
+          "x": 137.57682,
+          "y": 78.05912
+        }
+      },
+      "s": {
+        "text": "电缆",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8820,
+      "p": {
+        "position": {
+          "x": 138.57682,
+          "y": 96.05912
+        }
+      },
+      "s": {
+        "text": "2报",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8821,
+      "p": {
+        "position": {
+          "x": 138.19139,
+          "y": 111.45759
+        }
+      },
+      "s": {
+        "text": "警",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8822,
+      "p": {
+        "position": {
+          "x": 219.45023,
+          "y": 28.64929
+        }
+      },
+      "s": {
+        "text": "主变",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8823,
+      "p": {
+        "position": {
+          "x": 219.45023,
+          "y": 43.47987
+        }
+      },
+      "s": {
+        "text": "三侧",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8824,
+      "p": {
+        "position": {
+          "x": 219.45023,
+          "y": 60.50126
+        }
+      },
+      "s": {
+        "text": "开关",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8825,
+      "p": {
+        "position": {
+          "x": 219.45023,
+          "y": 77.05912
+        }
+      },
+      "s": {
+        "text": "断电",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8826,
+      "p": {
+        "position": {
+          "x": 219.45023,
+          "y": 93.47987
+        }
+      },
+      "s": {
+        "text": "信号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8827,
+      "p": {
+        "position": {
+          "x": 305.62623,
+          "y": 62.04119
+        }
+      },
+      "s": {
+        "text": "上信",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8828,
+      "p": {
+        "position": {
+          "x": 305.62623,
+          "y": 78.64929
+        }
+      },
+      "s": {
+        "text": "号阀",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8829,
+      "p": {
+        "position": {
+          "x": 387.38196,
+          "y": 76.05912
+        }
+      },
+      "s": {
+        "text": "号阀",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8830,
+      "p": {
+        "position": {
+          "x": 387.38196,
+          "y": 61.05912
+        }
+      },
+      "s": {
+        "text": "下号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8831,
+      "p": {
+        "position": {
+          "x": 461.84226,
+          "y": 61.50126
+        }
+      },
+      "s": {
+        "text": "水流",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8832,
+      "p": {
+        "position": {
+          "x": 461.84226,
+          "y": 77.05912
+        }
+      },
+      "s": {
+        "text": "指示",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8833,
+      "p": {
+        "position": {
+          "x": 461.84226,
+          "y": 92.47987
+        }
+      },
+      "s": {
+        "text": "动作",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8834,
+      "p": {
+        "position": {
+          "x": 461.84226,
+          "y": 107.31045
+        }
+      },
+      "s": {
+        "text": "信号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8835,
+      "p": {
+        "position": {
+          "x": 541.38588,
+          "y": 62.04119
+        }
+      },
+      "s": {
+        "text": "压力",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8836,
+      "p": {
+        "position": {
+          "x": 541.38588,
+          "y": 77.64929
+        }
+      },
+      "s": {
+        "text": "开关",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8837,
+      "p": {
+        "position": {
+          "x": 541.38588,
+          "y": 93.47987
+        }
+      },
+      "s": {
+        "text": "动作",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Text",
+      "i": 8838,
+      "p": {
+        "position": {
+          "x": 541.38588,
+          "y": 108.31045
+        }
+      },
+      "s": {
+        "text": "信号",
+        "text.color": "rgb(247,247,247)"
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8839,
+      "p": {
+        "displayName": "arrow",
+        "image": "symbols/basic/arrow.json",
+        "position": {
+          "x": 62.96505,
+          "y": 69.57527
+        },
+        "width": 45.12289,
+        "height": 18.14803
+      },
+      "s": {
+        "pixelPerfect": false,
+        "shape.foreground.gradient.color": null,
+        "2d.movable": false
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8840,
+      "p": {
+        "displayName": "arrow",
+        "image": "symbols/basic/arrow.json",
+        "position": {
+          "x": 146.11495,
+          "y": 69.90585
+        },
+        "width": 39.34077,
+        "height": 18.8092
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8841,
+      "p": {
+        "displayName": "arrow",
+        "image": "symbols/basic/arrow.json",
+        "position": {
+          "x": 229.37681,
+          "y": 70.40585
+        },
+        "width": 47.3468,
+        "height": 21.8092
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8842,
+      "p": {
+        "displayName": "arrow",
+        "image": "symbols/basic/arrow.json",
+        "position": {
+          "x": 314.00757,
+          "y": 70.05912
+        },
+        "width": 40.74878,
+        "height": 23
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8843,
+      "p": {
+        "displayName": "arrow",
+        "image": "symbols/basic/arrow.json",
+        "position": {
+          "x": 390.31102,
+          "y": 70.05912
+        },
+        "width": 43.06248,
+        "height": 20.75134
+      }
+    },
+    {
+      "c": "ht.Node",
+      "i": 8844,
+      "p": {
+        "displayName": "arrow",
+        "image": "symbols/basic/arrow.json",
+        "position": {
+          "x": 468.4696,
+          "y": 69.57527
+        },
+        "width": 39.83256,
+        "height": 20.75134
+      }
+    }
+  ],
+  "modified": "Wed Jul 24 2019 22:53:13 GMT+0800 (中国标准时间)",
+  "contentRect": {
+    "x": -1.01447,
+    "y": -35.96944,
+    "width": 592.40035,
+    "height": 172.42703
+  }
+}

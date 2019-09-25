@@ -1,0 +1,236 @@
+<template>
+	<div class="the-org-tree" :style="{ width: '100%' }">
+		<SearchTree
+			:render="renderContent"
+			v-if="treeReset"
+			@on-select-change="handleSelectNodes"
+			ref="orgTree"
+			clearable
+			:data="treeData"
+			placeholder="请输入关键词搜索..."
+		>
+			<Icon type="ios-search" slot="suffix" />
+		</SearchTree>
+		<Spin size="large" fix v-if="spinShow"></Spin>
+	</div>
+</template>
+<script>
+export default {
+	name: 'the-org-tree',
+	components: {},
+	props: {},
+	data() {
+		return {
+			// 手动更新标识
+			treeReset: true,
+			// 组织树数据源
+			treeData: [],
+			// 当前节点类型
+			nodeType: null,
+			// 当前组织id
+			activeOrgId: '',
+			// 当前站所id
+			activeStationId: '',
+			// 当前节点id
+			activeNodeId: '',
+			// 当前节点title
+			activeNodeTitle: '',
+			// 递归Tree标识
+			recursion: 0,
+			// loading
+			spinShow: false
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {},
+	created() {
+		this.init()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		// render图标
+		renderContent(h, { root, node, data }) {
+			// console.log(data)
+			let imgArr = [0, 1, 2, 3, 10070001, 10070002]
+			if (!imgArr.includes(data.type)) {
+				data.type = 'default'
+			}
+
+			let _this = this
+			return h(
+				'span',
+				{
+					style: {
+						display: 'inline-block',
+						width: '100%'
+					},
+					on: {
+						click() {
+							if (data.disabled) return
+							_this.$refs.orgTree.$refs.tree.handleSelect(data.nodeKey)
+						}
+					}
+				},
+				[
+					h('span', [
+						h('div', {
+							style: {
+								display: 'inline-block',
+								marginRight: '2px',
+								width: '15px',
+								height: '15px',
+								background: `url( ${require(`@/assets/img/org-tree-type/${data.type}.png`)} ) no-repeat`,
+								backgroundSize: '15px 15px',
+								position: 'relative',
+								top: '2px'
+							}
+						}),
+						h(
+							'span',
+							{
+								class: [
+									'ivu-tree-title',
+									{
+										'ivu-tree-title-selected': data.selected
+									}
+								]
+							},
+							data.title
+						)
+					])
+				]
+			)
+		},
+		// 设置所有父节点展开
+		setAllParentNodesExpand(tree, parentId) {
+			let origin = tree
+			let recursion = (tree, parentId) => {
+				tree.forEach(item => {
+					if (item.children && item.children.length > 0) {
+						recursion(item.children, parentId)
+					}
+					if (item.id == parentId) {
+						item.expand = true
+						recursion(origin, item.pid)
+					}
+				})
+			}
+			recursion(tree, parentId)
+		},
+		fingFirstNodeByFlag1(tree) {
+			tree.forEach((item, index) => {
+				let currentIndex = 0
+				if (item.children && item.children.length > 0) {
+					currentIndex = index
+				} else {
+					currentIndex = -1
+				}
+				if (this.recursion == 0 && item.flag == 1 && index == currentIndex + 1) {
+					this.recursion++
+					// 0:组织 1:站所
+					this.nodeType = item['flag']
+					this.$emit('sendActiveNodeType', this.nodeType)
+					// 更新 当前节点id
+					this.activeNodeId = item['id']
+					this.$emit('sendActiveNodeId', this.activeNodeId)
+					// 默认的下级请求参数 activeStationId
+					this.activeStationId = item['id']
+					this.$emit('sendActiveStationId', this.activeStationId)
+					// 默认的当前节点title
+					this.activeNodeTitle = item['title']
+					this.$emit('sendActiveNodeTitle', this.activeNodeTitle)
+					// 默认选中与展开
+					item.selected = true
+					item.expand = true
+					return
+				}
+				if (item.children && item.children.length > 0) {
+					this.fingFirstNodeByFlag1(item.children)
+				}
+			})
+		},
+		// 切换侧边栏是否展开
+		collapsedSider() {
+			this.$refs.Sider.toggleCollapse()
+		},
+		// 获取组织树信息
+		async getOrgTreeInfo() {
+			try {
+				this.spinShow = true
+				let result = await this.$api.deviceModeling.getOrgTreeInfo({
+					iFlag: 1
+				})
+				if (result.success) {
+					// 获取数据
+					this.treeData = result.data
+					// 处理默认参数
+					if (this.treeData[0]) {
+						// 查找到当前tree第一个站节点设定默认值与状态
+						this.recursion = 0
+						this.fingFirstNodeByFlag1(this.treeData)
+						// 设置所有父节点展开
+						this.setAllParentNodesExpand(this.treeData, this.activeNodeId)
+					} else {
+						this.nodeType = null
+						this.$emit('sendActiveNodeType', this.nodeType)
+						this.activeStationId = ''
+						this.$emit('sendActiveStationId', this.activeStationId)
+						this.activeNodeTitle = ''
+						this.$emit('sendActiveNodeTitle', this.activeNodeTitle)
+					}
+				}
+				this.spinShow = false
+			} catch(e) {
+				this.spinShow = false
+				this.$Message.error(`${e}`)
+			}
+			
+		},
+		init() {
+			this.getOrgTreeInfo()
+		},
+		// 选择节点
+		handleSelectNodes(node) {
+			if (JSON.stringify(node) == '[]') return
+			// 更新 当前节点类型
+			this.nodeType = node[0]['flag']
+			this.$emit('sendActiveNodeType', this.nodeType)
+			// 更新 当前节点id
+			this.activeNodeId = node[0]['id']
+			this.$emit('sendActiveNodeId', this.activeNodeId)
+			if (node[0].flag == 0) {
+				this.activeOrgId = node[0]['id']
+				this.$emit('sendActiveOrgId', this.activeOrgId)
+			} else {
+				this.activeStationId = node[0]['id']
+				this.$emit('sendActiveStationId', this.activeStationId)
+			}
+			// 更新 当前节点title
+			this.activeNodeTitle = node[0]['title']
+			this.$emit('sendActiveNodeTitle', this.activeNodeTitle)
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.the-org-tree {
+	/deep/ .ivu-tree {
+		width: 220px;
+		height: calc(100vh - 213px);
+		overflow-y: auto;
+	}
+}
+</style>

@@ -1,0 +1,56 @@
+{
+  "modified": "Fri Jul 19 2019 09:59:21 GMT+0800 (中国标准时间)",
+  "dataBindings": [
+    {
+      "attr": "alarmLevel",
+      "valueType": "Number",
+      "defaultValue": 0,
+      "name": "报警等级"
+    },
+    {
+      "attr": "blink.visible",
+      "valueType": "Boolean",
+      "name": "闪烁"
+    },
+    {
+      "attr": "isOnline",
+      "valueType": "Number",
+      "defaultValue": 0,
+      "name": "是否在线"
+    }
+  ],
+  "width": 32,
+  "height": 32,
+  "comps": [
+    {
+      "type": "image",
+      "name": {
+        "func": "__ht__function(data, view) {\nvar status = data.a('isOnline');\r\nif(status==0){\r\n    return 'symbols/QIF/qiuji0.json';\r\n}\r\nreturn 'symbols/QIF/qiuji1.json';\n}",
+        "value": "symbols/QIF/qiuji0.json"
+      },
+      "displayName": "qiuji0",
+      "rect": [
+        0,
+        0,
+        32,
+        32
+      ]
+    },
+    {
+      "type": "image",
+      "color": "rgb(255,0,0)",
+      "name": "symbols/QIF/alarm.json",
+      "visible": {
+        "func": "attr@blink.visible",
+        "value": false
+      },
+      "displayName": "alarm",
+      "rect": [
+        20.00633,
+        18.31216,
+        6.5,
+        6.5
+      ]
+    }
+  ]
+}

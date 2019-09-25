@@ -1,0 +1,1608 @@
+<template>
+	<div class="linkage-config">
+		<!-- 左侧树 -->
+		<div class="lf-tree">
+			<search-tree @on-select-change="treeClick" placeholder="请输入变电站名称" :data="treeList"></search-tree>
+		</div>
+		<!-- 右侧主体内容 -->
+		<div class="rt-content">
+			<div class="top-header">
+				<!-- 顶部tabs -->
+				<div class="rt-tabs">
+					<span @click="changeTab(item)" v-for="(item, idx) in tabList" :key="idx" :class="item.active == true ? 'myTabs active' : 'myTabs'">{{
+						item.name
+					}}</span>
+				</div>
+				<!-- 顶部联动类型 -->
+				<div class="rt-search">
+					<label>联动类型</label>
+					<Select ref="store" v-model="selectType" class="selectType" @on-change="selectChange(selectType)">
+						<Option v-for="item in typeList" :value="item.value" :key="item.value">{{ item.label }}</Option>
+					</Select>
+				</div>
+				<div class="btn-box">
+					<Button type="success" size="large" icon="md-add" @click="handleConfig('add')">配置</Button>
+				</div>
+			</div>
+
+			<!-- 右侧列表内容 -->
+			<div class="rt-table" ref="tableBox">
+				<Table :height="680" border :columns="devList.columns" :data="devList.data" ref="tables"></Table>
+				<!-- 分页 -->
+				<div class="table-page">
+					<div class="page-content">
+						<Page
+							@on-change="handleChangePage"
+							@on-page-size-change="handleChangePageSize"
+							:total="total"
+							:current="page"
+							:page-size="pageSize"
+							show-elevator
+							show-total
+							show-sizer
+						/>
+					</div>
+				</div>
+			</div>
+			<Modal v-model="modalShow" width="1200" title="配置联动节点" :mask-closable="false" class="configModal">
+				<div slot="footer">
+					<Button type="text" size="large" @click="modalShow = false">取消</Button>
+					<Button type="primary" size="large" @click="handleSaveLink">确认</Button>
+				</div>
+				<div class="modalCtn">
+					<!-- 模态框顶部内容 -->
+					<div class="modal-top" v-if="modalTab">
+						<span
+							@click="handleModalTabs(item)"
+							v-for="(item, idx) in modalData.tabList"
+							:key="idx"
+							:class="item.active == true ? 'myTabs active' : 'myTabs'"
+							>{{ item.name }}</span
+						>
+					</div>
+					<div class="modal-top" v-if="!modalTab">
+						<span class="myTabs active">{{ modalTabName }}</span>
+					</div>
+					<!-- 模态框内容 -->
+					<div class="modal-content" v-if="modalShow">
+						<!-- 左侧树 -->
+						<div class="modalCtn-lf">
+							<!-- 联动节点树 -->
+							<div class="modalTree-lf" v-loading="leftLoading">
+								<div class="lf-top">联动节点</div>
+								<Tree :data="linkTree" @on-select-change="handleLfLinkTree"></Tree>
+							</div>
+							<!-- 报警节点树 -->
+							<div class="modalTree-rt" v-loading="rightLoading">
+								<div class="lf-top">执行节点</div>
+								<Tree :data="configTree" @on-select-change="handleRtLinkTree"></Tree>
+							</div>
+						</div>
+
+						<!-- 右侧列表 -->
+						<div class="modalCtn-rt">
+							<Table
+								border
+								:columns="modalData.nodeList.columns"
+								:data="modalData.nodeList.data"
+								@on-filter-change="filterChange"
+								height="460"
+							></Table>
+						</div>
+					</div>
+				</div>
+			</Modal>
+		</div>
+
+		<Modal v-model="clientModal" title="客户端屏幕" footer-hide :mask-closable="false">
+			<ul class="client-box">
+				<li v-for="(item, index) in clients" :key="index" @click="handleClient(item)">{{ item }}</li>
+			</ul>
+		</Modal>
+
+		<Modal v-model="tvModal" title="解码服务" :width="450" footer-hide :mask-closable="false">
+			<div>选择解码服务</div>
+			<Select v-model="tvSelect" style="width:400px">
+				<Option v-for="item in tvCityList" :value="item.value" :key="item.value">{{ item.label }}</Option>
+			</Select>
+			<Tabs value="name1">
+				<TabPane label="一画面" name="name1">
+					<ul class="screen1">
+						<li v-for="(item, index) in tvNum" :key="index" @click="tvClick(1, item)">{{ '输出' + item }}</li>
+					</ul>
+				</TabPane>
+				<TabPane label="四画面" name="name2">
+					<ul class="screen4">
+						<li v-for="(item, index) in tvNum" :key="index">
+							<span v-for="(ite, idx) in [1, 2, 3, 4]" :key="idx" @click="tvClick(4, item, ite)">{{ ite }}</span>
+						</li>
+					</ul>
+				</TabPane>
+				<TabPane label="九画面" name="name3">
+					<ul class="screen9">
+						<li v-for="(item, index) in tvNum" :key="index">
+							<span v-for="(ite, idx) in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="idx" @click="tvClick(9, item, ite)">{{ ite }}</span>
+						</li>
+					</ul>
+				</TabPane>
+			</Tabs>
+		</Modal>
+	</div>
+</template>
+<script>
+import expandRow from './table-expand'
+import qs from 'qs'
+export default {
+	name: 'linkage-config',
+	components: {},
+	props: {},
+	data() {
+		return {
+			leftLoading: false,
+			rightLoading: false,
+			axios: this.$api.linkageConfig,
+			unitId: null, // 站点ID
+			orgId: null, // 区域ID
+			nodeId: null, // 节点ID
+			devId: null, // 设备ID
+			selectTab: 0, // 当前选中的模块 0客户端 1场景 2电视墙
+			selectType: 3, // 顶部下拉框的联动类型 0告知 1报警 2关联 3全部
+			type: 0, // 弹窗内的联动类型 0告知 1报警 2关联
+			modalTabs: '',
+			modalShow: false, // 弹窗
+			modalTab: true, // 新增或者修改时显示对应的Tabs
+			modalTabName: null, // 修改显示的tabs
+			linkFlag: false, // 判断有没有选择联动节点
+			treeList: [], // 运维班站点树数据
+			linkTree: [], // 联动节点树
+			configTree: [], // 执行节点树
+			stationName: null, // 弹窗内站点名称
+			modalDevName: null, // 弹窗内的设备名称
+			clientModal: false, // 客户端屏幕弹窗
+			tvModal: false, // 电视墙弹窗
+			tvService: null, // 电视墙解码服务
+			clients: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], // 客户端屏幕数量
+			tvNum: [], // 解码服务屏幕数量
+			clientScreenId: null, // 选择的客户端屏幕
+			tvCityList: [], // 解码服务下拉框
+			tvSelect: null, // 选中的解码服务
+			decScreenId: null, // 解码屏幕
+			decSubScreenId: null, // 解码子画面
+			clientFlag: false,
+			isAdd: true, // 判断保存时是新增还是修改
+			// 顶部tab
+			tabList: [
+				{
+					active: true,
+					value: 0,
+					name: '客户端'
+				},
+				{
+					active: false,
+					value: 1,
+					name: '场景'
+				},
+				{
+					active: false,
+					value: 2,
+					name: '电视墙'
+				}
+			],
+			// 联动类型列表
+			typeList: [
+				{
+					value: 3,
+					label: '全部'
+				},
+				{
+					value: 0,
+					label: '告知'
+				},
+				{
+					value: 1,
+					label: '报警'
+				},
+				{
+					value: 2,
+					label: '关联'
+				}
+			],
+			// 表格数据
+			devList: {
+				columns: [
+					{
+						type: 'expand',
+						width: 25,
+						render: (h, params) => {
+							return h(expandRow, {
+								props: {
+									row: params.row
+								},
+								on: {}
+							})
+						}
+					},
+					{
+						title: '所在组织',
+						key: 'orgName',
+						align: 'center',
+						width: 150
+					},
+					{
+						title: '站端',
+						key: 'stationName',
+						align: 'center',
+						width: 150
+					},
+					{
+						title: '设备',
+						key: 'devName',
+						align: 'center',
+						filters: [],
+						filterMultiple: true, // 设置筛选是否多选
+						filterMethod(value, row) {
+							if (value === row.index) {
+								return row.index == value
+							}
+						}
+					},
+					{
+						title: '节点',
+						key: 'nodeName',
+						align: 'center'
+					},
+					{
+						title: '联动值',
+						key: 'fValue1',
+						width: 100,
+						align: 'center'
+					},
+					{
+						title: '联动节点数',
+						key: 'linkNodeNumber',
+						width: 110,
+						align: 'center'
+					},
+					{
+						title: '联动类型',
+						key: 'iType1',
+						width: 100,
+						align: 'center',
+						render: (h, params) => {
+							return h('div', [
+								params.row.iType == '0'
+									? h('p', params.row.iType1)
+									: params.row.iType == '1'
+									? h('b', params.row.iType1)
+									: h('li', params.row.iType1)
+							])
+						}
+					},
+					{
+						title: '操作',
+						key: 'action',
+						align: 'center',
+						width: '210',
+						render: (h, params) => {
+							return h('div', [
+								h(
+									'Button',
+									{
+										props: {
+											type: 'warning',
+											icon: 'ios-create-outline'
+										},
+										style: {
+											marginRight: '5px'
+										},
+										on: {
+											click: () => {
+												this.handleConfig('update', params)
+											}
+										}
+									},
+									'修改'
+								),
+								h(
+									'Button',
+									{
+										props: {
+											type: 'error',
+											icon: 'md-trash'
+										},
+										on: {
+											click: () => {
+												this.editDev(params)
+											}
+										}
+									},
+									'删除'
+								)
+							])
+						}
+					}
+				],
+
+				data: []
+			},
+			// 实际的弹窗数据
+			modalData: {
+				tabList: [
+					{
+						active: true,
+						value: 0,
+						name: '告知'
+					},
+					{
+						active: false,
+						value: 1,
+						name: '报警'
+					},
+					{
+						active: false,
+						value: 2,
+						name: '关联'
+					}
+				], // tabs列表
+				selectTab: 0, // 模态框选中的tabs
+				nodeList: {
+					columns: [],
+					data: []
+				}
+			},
+			// 客户端和场景的弹窗数据
+			clientTable: {
+				columns: [
+					{
+						title: '站端',
+						key: 'clientStationinfoName',
+						align: 'center'
+					},
+					{
+						title: '设备',
+						key: 'clientEqupmentinfoName',
+						align: 'center'
+					},
+					{
+						title: '节点',
+						key: 'clientNodeinfoName',
+						align: 'center'
+					},
+					{
+						title: '参数',
+						key: 'fParam1',
+						align: 'center'
+					},
+					{
+						title: '客户端屏幕',
+						key: 'clientScreenId',
+						align: 'center'
+					},
+					{
+						title: '操作',
+						key: 'action',
+						width: 100,
+						align: 'center',
+						render: (h, params) => {
+							return h('div', [
+								h(
+									'Button',
+									{
+										props: {
+											type: 'error',
+											size: 'small'
+										},
+										on: {
+											click: () => {
+												this.delDevList(params)
+											}
+										}
+									},
+									'删除'
+								)
+							])
+						}
+					}
+				],
+				data: []
+			},
+			// 电视墙的弹窗数据
+			tvTable: {
+				columns: [
+					{
+						title: '站端',
+						key: 'clientStationinfoName',
+						align: 'center'
+					},
+					{
+						title: '设备',
+						key: 'clientEqupmentinfoName',
+						align: 'center'
+					},
+					{
+						title: '节点',
+						key: 'clientNodeinfoName',
+						align: 'center'
+					},
+					{
+						title: '预置位',
+						key: 'fParam1',
+						align: 'center'
+					},
+					{
+						title: '解码输出',
+						key: 'clientScreenId',
+						align: 'center'
+					},
+					{
+						title: '操作',
+						key: 'action',
+						width: 150,
+						align: 'center',
+						render: (h, params) => {
+							return h('div', [
+								h(
+									'Button',
+									{
+										props: {
+											type: 'error',
+											size: 'small'
+										},
+										on: {
+											click: () => {
+												this.delTvList(params)
+											}
+										}
+									},
+									'删除'
+								)
+							])
+						}
+					}
+				],
+				data: []
+			},
+			linkType: {
+				0: '告知联动',
+				1: '报警联动',
+				2: '关联'
+			}, // 联动类型  方便调取表格接口后直接取对应字符串
+			ltdata: null, // 筛选数据
+			linkNum: null, // 联动节点数
+			formData: {},
+			page: 1,
+			pageSize: 20,
+			total: 0,
+			ltdata: null,
+			modalTableData: {}, // 弹窗表格数据
+			linkAddFormData: {}, // 弹窗联动节点标点
+			lfId: null // 左侧树ID
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		modalShow(val) {
+			if (!val) {
+				this.modalData.nodeList.data = []
+				this.linkFlag = false
+				this.formData = {}
+			}
+		},
+		clientModal(val) {
+			if (!val) {
+				this.clientScreenId = null
+			}
+		}
+	},
+	created() {},
+	mounted() {
+		this.getStationTree()
+	},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		// 获取左侧站点树
+		getStationTree() {
+			this.axios.getTreeList({ iFlag: 2 }).then(res => {
+				if (res.data && res.code == 200) {
+					this.orgId = res.data[0].id // 获取默认展示数据的orgId
+					this.getLintTable()
+					this._forEach(res.data, true, item => {
+						item.expand = true
+						if (item.id == 'e821343f8009468db7c30488f28140f1') {
+							item.selected = true
+						}
+					})
+					this.treeList = res.data
+				}
+			})
+		},
+		// 获取联动节点树
+		getLfLinkTree() {
+			this.linkTree = []
+			this.configTree = []
+			let selectTab = this.modalData.selectTab
+			let params = {
+				type: 0,
+				subSystemId: 0,
+				treeType: selectTab == 0 ? 4 : selectTab == 1 ? 4 : 3,
+				actionType: selectTab == 1 ? 1 : 0,
+				unitId: this.unitId
+			}
+			this.leftLoading = true
+			this.axios
+				.getLinkTree(params)
+				.then(res => {
+					// this.delVideo(res.data)
+					// for (let i = 0; i < res.data.length; i++) {
+					// 	// 去除联动节点的视频
+					// 	if (res.data[i].video) {
+					// 		continue
+					// 	} else {
+					// 		this.linkTree.push(res.data[i])
+					// 	}
+					// }
+					for (let i = 0; i < res.data.length; i++) {
+						// 去除联动节点的视频
+						if (res.data[i].title == '视频系统') {
+							continue
+						} else {
+							this.linkTree.push(res.data[i])
+						}
+					}
+
+					if (!this.isAdd) {
+						this._forEach(this.linkTree, true, item => {
+							if (this.lfId == item.id.split('_')[1]) {
+								this.openTree(item.pid)
+							}
+						})
+					}
+					this.leftLoading = false
+				})
+				.catch(error => {
+					this.leftLoading = false
+				})
+		},
+		// 展开树
+		openTree(pid) {
+			this._forEach(this.linkTree, true, item => {
+				// console.log(item)
+				// if (pid == item.id) {
+				// if (item.flag == 2) {
+				// item.expand = true
+				// } else {
+				// this.getDevId(this.linkTree, item.pid)
+				// }
+				// }
+			})
+		},
+		// 获取执行节点树
+		getRtLinkTree() {
+			this.rightLoading = true
+			if (this.selectTab == 1) {
+				// 如果是场景
+				let params = {
+					flag: 2,
+					key: this.unitId
+				}
+
+				this.axios
+					.getSceneTree(params)
+					.then(res => {
+						if (res.code == 200 && res.data) {
+							this.configTree = JSON.parse(JSON.stringify(res.data))
+							this.rightLoading = false
+						} else {
+							this.rightLoading = false
+						}
+					})
+					.catch(error => {
+						this.rightLoading = false
+					})
+			} else {
+				//
+				let selectTab = this.modalData.selectTab
+				let params = {
+					type: 0,
+					subSystemId: this.selectTab == 2 ? '1009' : 0, // 如果是电视墙 只展示视频
+					treeType: 4,
+					actionType: 0,
+					unitId: this.unitId
+				}
+				if (this.selectTab == 2) {
+					params.treeType = 5
+				}
+
+				this.axios
+					.getLinkTree(params)
+					.then(res => {
+						if (res.data && res.code == 200) {
+							this.setVideo(res.data) // 给视频添加标识
+							this.configTree = JSON.parse(JSON.stringify(res.data))
+							this.rightLoading = false
+						} else {
+							this.rightLoading = false
+						}
+					})
+					.catch(error => {
+						this.rightLoading = false
+					})
+			}
+		},
+		// 左侧站点树点击
+		treeClick(node) {
+			if (node) {
+				if (node[0].flag == 1) {
+					this.stationName = node[0].title
+					this.unitId = node[0].id
+					this.orgId = null // 点击变电站清空orgId
+				} else if (node[0].flag == 0) {
+					this.orgId = node[0].id
+					this.unitId = null // 点击非变电站清空stationId
+				}
+				this.getLintTable()
+			}
+		},
+		// 弹窗联动节点树点击
+		handleLfLinkTree(node) {
+			if (node[0].flag == 4 || (this.modalData.selectTab == 2 && node[0].flag == 3)) {
+				this.toLfTree(this.linkTree, node[0].pid)
+				let devNodeId = null
+				if (this.modalData.selectTab == 2) {
+					this.devId = node[0].pid
+					devNodeId = node[0].id.split('_')[1]
+				} else {
+					this.getDevId(this.linkTree, node[0].pid)
+					devNodeId = node[0].pid.split('_')[1]
+				}
+				this.linkFlag = true
+
+				let dveId = this.devId.split('_')[1]
+
+				this.formData.unitId = this.unitId
+				this.formData.devId = dveId
+				this.formData.devNodeId = devNodeId // 节点ID
+				this.formData.iType = this.modalData.selectTab // 联动类型 告知报警关联
+				this.formData.iCategory = this.selectTab // 客户端 场景 电视墙
+				this.formData.fValue = node[0].text
+				this.formData.iSort = this.total
+			} else {
+				this.$Message.warning('当前非最终节点')
+			}
+		},
+		// 弹窗执行节点树点击
+		handleRtLinkTree(node) {
+			if (this.linkFlag == true || this.isAdd == false) {
+				if (
+					(this.selectTab == 0 && node[0].flag == 4) ||
+					(node[0].videos && node[0].flag == 3) ||
+					(this.selectTab == 1 && node[0].flagName == 'scene') ||
+					(this.selectTab == 2 && node[0].flag == 5)
+				) {
+					if (node[0].videos && this.selectTab == 0) {
+						// 展示客户端屏幕弹窗
+						this.clientModal = true
+						this.setForm(node, 1)
+					} else if (this.selectTab == 2) {
+						// 如果是电视墙
+						this.axios.getService().then(res => {
+							// 请求解码服务
+							if (res.code == 200 && res.data) {
+								this.tvNum = []
+								this.tvCityList = []
+								for (let i = 0; i < res.data[0].iFlag; i++) {
+									// 设置展示几个输出
+									this.tvNum.push(i + 1)
+								}
+								res.data.forEach(item => {
+									// 循环遍历 得到下拉框展示的内容
+									let obj = {
+										value: item.serviceId,
+										label: item.vcIP + ':' + item.iPort
+									}
+									this.tvCityList.push(obj)
+								})
+								this.tvModal = true
+								this.setForm(node, 2)
+							}
+						})
+					} else {
+						let nodeKey = ''
+						this._forEach(this.configTree, true, item => {
+							if (node[0].pid == item.id) {
+								nodeKey = item.title
+								this.clientFlag = false
+							}
+						})
+						this.toRtTree(this.configTree, node[0].pid)
+						/** ******************生成弹窗列表数据******************/
+						this.modalTableData = {
+							clientStationinfoName: this.stationName, // 站端
+							clientEqupmentinfoName: this.modalDevName, // 设备
+							clientNodeinfoName: nodeKey, // 节点
+							fParam1: node[0].title, // 参数
+							clientScreenId: '-' // 客户端屏幕
+						}
+
+						this.modalData.nodeList.data.push(this.modalTableData)
+
+						/***************************************************/
+						/** ****************生成提交的表单数据*****************/
+						if (this.selectTab == 0) {
+							this.getDevId(this.configTree, node[0].pid)
+							let devNodeId = node[0].pid.split('_')[1]
+							let devId = this.devId.split('_')[1]
+							// 客户端
+							let obj = {
+								devNodeId: devNodeId,
+								devId: devId,
+								fParam1: node[0].text
+							}
+							this.formData.linkNodeClientList.push(obj)
+						} else if (this.selectTab == 1) {
+							// 场景
+							let obj = {
+								sceneId: node[0].id
+							}
+							this.formData.linkNodeSceneList.push(obj)
+						}
+					}
+
+					/***************************************************/
+				} else {
+					this.$Message.warning('当前非最终节点')
+				}
+			} else {
+				this.$Message.warning('请先选择联动节点')
+			}
+		},
+		// 生成弹窗数据和form数据
+		setForm(node, type) {
+			console.log(node)
+			let nodeKey = ''
+			this._forEach(this.configTree, true, item => {
+				if (node[0].pid == item.id) {
+					nodeKey = item.title
+					this.clientFlag = false
+				}
+			})
+			this.toRtTree(this.configTree, node[0].pid)
+
+			if (type == 1) {
+				/** ******************客户端生成弹窗列表数据******************/
+				console.log(node)
+				console.log(this.modalDevName)
+				if (node[0].videos) {
+					this.modalTableData = {
+						clientStationinfoName: this.stationName, // 站端
+						clientEqupmentinfoName: this.modalDevName, // 设备
+						clientNodeinfoName: node[0].title, // 节点
+						fParam1: '-', // 参数
+						clientScreenId: this.clientScreenId // 客户端屏幕
+					}
+				} else {
+					this.modalTableData = {
+						clientStationinfoName: this.stationName, // 站端
+						clientEqupmentinfoName: this.modalDevName, // 设备
+						clientNodeinfoName: nodeKey, // 节点
+						fParam1: node[0].title, // 参数
+						clientScreenId: this.clientScreenId // 客户端屏幕
+					}
+				}
+
+				this.getDevId(this.configTree, node[0].pid)
+				let devNodeId = node[0].id.split('_')[1]
+				let devId = this.devId.split('_')[1]
+				/** **************************************************/
+
+				/** ****************客户端生成提交的表单数据*****************/
+
+				;(this.linkAddFormData.devNodeId = devNodeId), (this.linkAddFormData.devId = devId), (this.linkAddFormData.clientScreenId = this.clientScreenId) // 客户端屏幕
+
+				/** **************************************************/
+			} else if (type == 2) {
+				/** ******************电视墙生成弹窗列表数据******************/
+				this.modalTableData = {
+					clientStationinfoName: this.stationName, // 站端
+					clientEqupmentinfoName: this.modalDevName, // 设备
+					clientNodeinfoName: nodeKey, // 节点
+					fParam1: node[0].flag == 5 ? node[0].title : '-' // 参数
+				}
+				/** **************************************************/
+
+				/** ****************电视墙生成提交的表单数据*****************/
+
+				if (node[0].flag == 5) {
+					this.getDevId(this.configTree, node[0].pid)
+					let devNodeId = node[0].pid.split('_')[1]
+					let devId = this.devId.split('_')[1]
+					this.linkAddFormData.devId = devId
+					this.linkAddFormData.devNodeId = devNodeId
+					this.linkAddFormData.presetId = node[0].id.split('_')[1] // 预置位
+				} else {
+					this.linkAddFormData.devId = node[0].pid.split('_')[1]
+					this.linkAddFormData.devNodeId = node[0].id.split('_')[1]
+					this.linkAddFormData.presetId = null // 预置位
+				}
+
+				/** **************************************************/
+			}
+		},
+		// 处理联动节点树
+		toLfTree(dataList, pid) {
+			this._forEach(dataList, true, item => {
+				if (pid == item.id) {
+					if (item.flag == 2) {
+						this.nodeId = item.id
+					} else {
+						this.toLfTree(dataList, item.pid)
+					}
+				}
+			})
+		},
+		// 获取设备ID
+		getDevId(dataList, pid) {
+			this._forEach(dataList, true, item => {
+				if (pid == item.id) {
+					if (item.flag == 2) {
+						this.devId = item.id
+					} else {
+						this.getDevId(dataList, item.pid)
+					}
+				}
+			})
+		},
+		// 处理生成弹窗执行节点表格数据
+		toRtTree(dataList, pid) {
+			this._forEach(dataList, true, item => {
+				if (pid == item.id) {
+					if (item.flag == 2) {
+						this.modalDevName = item.title
+					} else {
+						this.toRtTree(dataList, item.pid)
+					}
+				}
+			})
+		},
+		// 给执行节点视频加上标识
+		setVideo(dataList) {
+			// this._forEach(dataList, true, item => {
+			// 	if (item.id.split('_')) {
+			// 		if (item.id.split('_')[1] == '10093001') {
+			// 			this._forEach(item.children, true, ite => {
+			// 				if (ite.flag == 3) {
+			// 					ite.videos = true
+			// 				}
+			// 			})
+			// 		}
+			// 	}
+			// })
+			dataList.forEach(item => {
+				if (item.title == '视频系统') {
+					this._forEach(item.children, true, ite => {
+						if (ite.flag == 3) {
+							ite.videos = true
+						}
+					})
+				}
+			})
+		},
+		// 给联动节点视频节点加上标识 方便去除
+		delVideo(dataList) {
+			// console.log(dataList)
+			// this._forEach(dataList, true, item => {
+			// 	console.log(item.id)
+			// 	if (item.id.split('_')) {
+			// 		let id = item.id.split('_')[1]
+			// 		if (id == '10093001') {
+			// 			this._forEach(dataList, item.pid, ite => {
+			// 				if (ite.id == item.pid) {
+			// 					ite.video = true
+			// 				}
+			// 			})
+			// 		}
+			// 	}
+			// })
+		},
+		// 顶部tabs点击
+		changeTab(tar) {
+			this.tabList.forEach(item => {
+				item.active = false
+			})
+			tar.active = true
+			this.selectTab = tar.value
+			this.getLintTable()
+		},
+		// 顶部下拉框选择
+		selectChange(selectType) {
+			this.selectType = selectType
+			this.getLintTable()
+		},
+		// 获取表格数据
+		getLintTable() {
+			let params = {
+				unitId: this.unitId,
+				orgId: this.orgId,
+				queryType: this.selectTab,
+				iType: this.selectType == 3 ? '' : this.selectType,
+				currentPage: this.page,
+				pageSize: this.pageSize
+			}
+			this.axios.getLinkTableByType(params).then(res => {
+				if (res.data && res.code == 200) {
+					let stationName = null // 子表站端名
+					let iType // 子表联动类型
+					res.data.lists.forEach((item, index) => {
+						stationName = item.stationName // 给子表赋值站端名号联动类型
+						iType = item.iType
+						item.linkNode.forEach(ite => {
+							ite.stationName = stationName
+							ite.iType = iType
+						})
+						item.iType == 0 ? (item.iType1 = '告知') : item.iType == 1 ? (item.iType1 = '报警') : (item.iType1 = '关联')
+						item.linkNodeNumber = item.linkNode.length
+						// 设置表格联动值
+
+						if (item.iType == 0) {
+							// 如果是告知
+							if (item.vcValueDesc) {
+								// 设置表格联动值
+								let index = item.fValue
+								index == 65535 || !index ? (index = 0) : (index = item.fValue)
+								let swArr = item.vcValueDesc.split('|')
+								if (swArr.length == 1) {
+									item.fValue1 = item.vcValueDesc.split('|')[0].split(' ')[1]
+								} else {
+									item.fValue1 = item.vcValueDesc.split('|')[index].split(' ')[1]
+								}
+							}
+						} else if (item.iType == 1) {
+							// 如果是报警联动
+							if (item.fValue == 0) {
+								item.fValue1 = '正常'
+							} else if (item.fValue == 1) {
+								item.fValue1 = '危机报警'
+							} else if (item.fValue == 2) {
+								item.fValue1 = '严重报警'
+							} else if (item.fValue == 3) {
+								item.fValue1 = '一般报警'
+							} else {
+								item.fValue1 = item.iAlarmLevel
+							}
+						} else if (item.iType == 2) {
+							item.fValue1 = '-'
+						}
+					})
+				}
+				this.total = res.data.page.totalNum
+				/** ***********************************筛选功能开始*************************************/
+				this.ltdata = res.data.lists // 将列表的数据复制一份 供筛选时与smtypeid对比 获取有多少联动节点数
+				for (let i = 0; i < res.data.lists.length; i++) {
+					// 先进行查重 如果重复 就给相同的index值用来判断
+					for (let j = 0; j < res.data.lists.length; j++) {
+						if (res.data.lists[i].devId == res.data.lists[j].devId) {
+							res.data.lists[j].index = i
+						}
+					}
+				}
+				let newArr = this.arrayUnique2(res.data.lists, 'devId') // 然后调用reduce方法进行去重
+				let arr = []
+				for (let i = 0; i < newArr.length; i++) {
+					// 接着将去重过的数据处理
+					let obj = {}
+					obj.label = newArr[i].devName
+					obj.value = newArr[i].index
+					arr.push(obj)
+				}
+				this.devList.columns[3].filters = arr // 添加给columns中的filters
+				/** ***********************************筛选功能结束*************************************/
+				this.devList.data = res.data.lists
+			})
+		},
+		// 新增或修改联动
+		handleConfig(type, params) {
+			if (this.selectTab == 0 || this.selectTab == 1) {
+				// 根据客户端或者电视墙展示不同弹窗表头
+				this.modalData.nodeList.columns = this.clientTable.columns
+			} else if (this.selectTab == 2) {
+				this.modalData.nodeList.columns = this.tvTable.columns
+			}
+			if (this.selectTab == 0) {
+				this.formData.linkNodeClientList = []
+			} else if (this.selectTab == 1) {
+				this.formData.linkNodeSceneList = []
+			} else if (this.selectTab == 2) {
+				this.formData.linkNodeTVList = []
+			}
+			if (type == 'add') {
+				// 如果是新增
+				if (this.unitId) {
+					// 先确认是否选择了变电站
+					this.isAdd = true // 告诉保存时是新增
+					this.modalShow = true // 显示弹窗
+					this.modalTab = true // 显示新增的Tabs
+					this.getLfLinkTree()
+					this.getRtLinkTree()
+				} else {
+					this.$Message.warning('请选择左侧变电站')
+				}
+			} else {
+				// 修改
+				console.log(this.modalTabName)
+				console.log(params.row)
+				this.isAdd = false // 告诉保存时是修改
+				this.modalTabName = params.row.iType1
+				this.modalShow = true // 显示弹窗
+				this.modalTab = false // 显示修改的Tabs
+				this.unitId = params.row.unitId // 将站点id 赋值为当前选中修改的站点
+				this.stationName = params.row.stationName // 将站点名称赋值为当前选中的站点名称
+				// this.selectTab = params.row.iCategory
+				this.lfId = params.row.devNodeId
+				this.getLfLinkTree()
+				this.getRtLinkTree()
+
+				let sub = params.row.linkNode
+				sub.forEach(item => {
+					// 将表格上的数据添加到弹窗表格内
+					item.isOld = true // 给原先已有的数据加上标识 方便区分删除
+					this.modalTableData = {
+						clientStationinfoName: this.stationName, // 站端
+						clientEqupmentinfoName: item.devName, // 设备
+						clientNodeinfoName: item.nodeName, // 节点
+						fParam1: item.clientScreenId ? '-' : item.fParam1, // 参数
+						clientScreenId: item.clientScreenId ? item.clientScreenId : '-' // 客户端屏幕
+					}
+					if (item.linkClientId) {
+						// 如果是客户端
+						if (item.vcValueDesc) {
+							// 设置表格联动值
+							let index = item.fValue
+							index == 65535 || !index ? (index = 0) : (index = item.fValue)
+							let swArr = item.vcValueDesc.split('|')
+							if (swArr.length == 1) {
+								this.modalTableData.fParam1 = item.vcValueDesc.split('|')[0].split(' ')[1]
+							} else {
+								this.modalTableData.fParam1 = item.vcValueDesc.split('|')[index].split(' ')[1]
+							}
+						}
+					}
+					if (item.decScreenId) {
+						// 如果是电视墙修改
+						this.modalTableData.clientScreenId = item.decSubScreenId ? item.decScreenId + '-' + item.decSubScreenId : item.decScreenId
+						this.modalTableData.fParam1 = item.presetName ? item.presetName : '-'
+					} else if (item.sceneId) {
+						// 如果是场景
+						this.modalTableData.clientEqupmentinfoName = '-'
+						this.modalTableData.clientNodeinfoName = '-'
+						this.modalTableData.fParam1 = item.sceneName
+					}
+
+					this.modalData.nodeList.data.push(this.modalTableData)
+				})
+
+				/** ********************设置修改的默认联动节点formData数据*************************/
+				this.formData = {
+					linkId: params.row.linkId,
+					unitId: params.row.unitId,
+					devId: params.row.devId,
+					devNodeId: params.row.devNodeId, // 节点ID
+					iType: params.row.iType, // 联动类型 告知报警关联
+					iCategory: params.row.iCategory, // 客户端 场景 电视墙
+					fValue: params.row.fValue,
+					iSort: params.row.iSort - 0
+				}
+				if (this.selectTab == 0) {
+					this.formData.linkNodeClientList = []
+
+					params.row.linkNode.forEach(item => {
+						if (item.clientScreenId && item.clientScreenId != '-') {
+							let obj = {
+								devNodeId: item.devNodeId,
+								devId: item.devId,
+								clientScreenId: item.clientScreenId
+							}
+							this.formData.linkNodeClientList.push(obj)
+						} else {
+							let obj = {
+								devNodeId: item.devNodeId,
+								devId: item.devId
+							}
+							this.formData.linkNodeClientList.push(obj)
+						}
+					})
+				} else if (this.selectTab == 1) {
+					this.formData.linkNodeSceneList = []
+					params.row.linkNode.forEach(item => {
+						let obj = {
+							sceneId: item.sceneId
+						}
+						this.formData.linkNodeSceneList.push(obj)
+					})
+				} else if (this.selectTab == 2) {
+					this.formData.linkNodeTVList = []
+					params.row.linkNode.forEach(item => {
+						;(this.linkAddFormData.devId = item.devId),
+							(this.linkAddFormData.devNodeId = item.devNodeId),
+							(this.linkAddFormData.presetId = item.presetId), // 预置位
+							(this.linkAddFormData.decServiceId = item.decServiceId), // 解码服务
+							(this.linkAddFormData.decScreenId = item.decScreenId),
+							(this.linkAddFormData.decSubScreenId = item.decSubScreenId)
+						let forData = JSON.parse(JSON.stringify(this.linkAddFormData)) // 深拷贝一下 否则会修改一个全部都改
+						this.formData.linkNodeTVList.push(forData)
+					})
+				}
+			}
+		},
+		// 弹窗保存
+		handleSaveLink() {
+			// 新增保存
+			if (this.isAdd) {
+				this.formData.iSort = this.total
+
+				this.axios.addSaveLink(JSON.stringify(this.formData)).then(res => {
+					if (res.code == 200) {
+						this.$Message.success('配置成功!')
+						this.modalData.nodeList.data = []
+						if (this.selectTab == 0) {
+							this.formData.linkNodeClientList = []
+						} else if (this.selectTab == 1) {
+							this.formData.linkNodeSceneList = []
+						} else if (this.selectTab == 2) {
+							this.formData.linkNodeTVList = []
+						}
+						this.getLintTable()
+					} else {
+						this.$Message.error(res.msg)
+					}
+				})
+			} else {
+				// 修改保存
+				this.axios.upSaveLink(JSON.stringify(this.formData)).then(res => {
+					if (res.code == 200) {
+						this.$Message.success('修改成功!')
+						this.getLintTable()
+					} else {
+						this.$Message.error(res.msg)
+					}
+				})
+			}
+		},
+		// 删除主表
+		editDev(params) {
+			this.$Modal.confirm({
+				title: '提示',
+				content: '确定要删除联动节点以及被联动节点吗?',
+				onOk: () => {
+					this.axios.delLink(params.row.linkId).then(res => {
+						if (res.code == 200) {
+							this.$Message.success('删除成功')
+							this.getLintTable()
+						} else {
+							this.$Message.error(res.msg)
+						}
+					})
+				}
+			})
+		},
+		// 弹窗内Tabs点击
+		handleModalTabs(tar) {
+			this.type = tar.value
+			this.modalData.tabList.forEach(item => {
+				item.active = false
+			})
+			tar.active = true
+			this.modalData.selectTab = tar.value
+			this.getLfLinkTree()
+			this.getRtLinkTree()
+		},
+		// 弹窗内删除
+		delDevList(params) {
+			this.modalData.nodeList.data.splice(params.index, 1)
+			if (this.selectTab == 0) {
+				this.formData.linkNodeClientList.splice(params.index, 1)
+			} else if (this.selectTab == 1) {
+				this.formData.linkNodeSceneList.splice(params.index, 1)
+			}
+		},
+		// 弹窗内删除电视墙
+		delTvList(params) {
+			this.modalData.nodeList.data.splice(params.index, 1)
+			this.formData.linkNodeTVList.splice(params.index, 1)
+		},
+		// 客户端弹窗点击
+		handleClient(item) {
+			this.clientModal = false
+			this.clientScreenId = item
+			this.modalTableData.clientScreenId = this.clientScreenId // 弹窗表格屏幕
+			this.linkAddFormData.clientScreenId = this.clientScreenId // 接口数据的屏幕
+			this.formData.linkNodeClientList.push(JSON.parse(JSON.stringify(this.linkAddFormData)))
+			this.modalData.nodeList.data.push(this.modalTableData)
+		},
+		// 电视墙解码服务点击
+		tvClick(type, num, num1) {
+			this.tvModal = false
+			this.decScreenId = num
+			this.decSubScreenId = num1
+			this.modalTableData.clientScreenId = this.decSubScreenId ? this.decScreenId + '-' + this.decSubScreenId : this.decScreenId
+			this.linkAddFormData.decScreenId = this.decScreenId
+			this.linkAddFormData.decSubScreenId = this.decSubScreenId
+			this.linkAddFormData.decServiceId = this.tvSelect // 解码服务
+			this.formData.linkNodeTVList.push(JSON.parse(JSON.stringify(this.linkAddFormData)))
+			this.modalData.nodeList.data.push(this.modalTableData)
+			console.log(this.formData.linkNodeTVList)
+		},
+		// 筛选功能---数组对象通过指定值去重
+		arrayUnique2(arr, name) {
+			var hash = {}
+			return arr.reduce(function(item, next) {
+				hash[next[name]] ? '' : (hash[next[name]] = true && item.push(next))
+				return item
+			}, [])
+		},
+		// 筛选时触发
+		filterChange(data) {
+			if (data._filterChecked.length > 0) {
+				let num = 0
+				for (let i = 0; i < this.ltdata.length; i++) {
+					for (let j = 0; j < data._filterChecked.length; j++) {
+						if (data._filterChecked[j] == this.ltdata[i].index) {
+							num++
+						}
+					}
+				}
+				this.linkNum = num
+			} else {
+				this.linkNum = this.backNum // 点击重置的话就还原成备份的数值
+			}
+		},
+		// 分页改变
+		handleChangePage(page) {
+			this.page = page
+			this.getLintTable()
+		},
+		// 每页数量改变
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getLintTable()
+		}
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.linkage-config {
+  width: 100%;
+  height: calc(100vh - 160px);
+  display: flex;
+
+  .lf-tree {
+    width: 240px;
+    height: calc(100% - 50px);
+    background-color: #fff;
+    overflow: auto;
+  }
+
+  .rt-content {
+    width: calc(100% - 250px);
+    height: 100%;
+    margin-left: 10px;
+
+    .top-header {
+      width: 100%;
+      height: 100px;
+      background-color: #fff;
+      padding: 10px;
+
+      .rt-tabs { // 顶部tabs
+        height: 40px;
+        line-height: 40px;
+        float: left;
+
+        .myTabs {
+          display: inline-block;
+          width: 100px;
+          height: 100%;
+          border-radius: 5px;
+          margin-right: 5px;
+          text-align: center;
+          font-size: 16px;
+          background: #e8eaec;
+          cursor: pointer;
+        }
+
+        .active {
+          background: #5cadff;
+          color: #fff;
+        }
+      }
+
+      .rt-search { // 顶部联动类型
+        height: 40px;
+        line-height: 40px;
+        padding-left: 15px;
+        float: left;
+
+        label {
+          font-size: 14px;
+        }
+
+        .selectType {
+          width: 130px;
+          margin: 0 10px;
+        }
+
+        i {
+          display: block;
+          width: 20px;
+          height: 20px;
+        }
+      }
+
+      .btn-box {
+        float: left;
+        width: 100%;
+        height: 40px;
+        margin-top: 5px;
+      }
+    }
+
+    .rt-table {
+      width: 100%;
+      height: calc(100% - 110px);
+      margin-top: 10px;
+      width: 100%;
+      flex: 1;
+      position: relative;
+
+      .ivu-table-wrapper {
+        width: 100%;
+        position: absolute;
+        top: 0;
+        height: calc(100% - 50px) !important;
+      }
+
+      /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+        height: calc(100% - 40px) !important;
+      }
+
+      /deep/.ivu-table {
+        p {
+          color: #19be6b;
+        }
+
+        b {
+          font-weight: 400;
+          color: #ff9900;
+        }
+
+        li {
+          list-style: none;
+          color: #2d8cf0;
+        }
+      }
+
+      /deep/tr.ivu-table-row-hover td {
+        background-color: #F5F7FA;
+      }
+
+      /deep/.ivu-btn {
+        font-size: 14px;
+      }
+
+      .table-page {
+        width: 100%;
+        position: absolute;
+        bottom: 2px;
+
+        .page-content {
+          width: 800px;
+          margin-left: 50%;
+          transform: translateX(-50%);
+        }
+      }
+    }
+  }
+}
+
+// 模态框内容
+.modalCtn {
+  height: 500px;
+  border: 1px solid #ccc;
+  position: relative;
+
+  .xBtn {
+    position: absolute;
+    top: -70px;
+    right: -20px;
+    width: 60px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+    font-size: 20px;
+    cursor: pointer;
+  }
+
+  .modal-top {
+    height: 40px;
+    line-height: 40px;
+    border-bottom: $border;
+
+    .myTabs {
+      display: inline-block;
+      height: 100%;
+      padding: 0 30px;
+      background: #f3f3f3;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .active {
+      background: #5cadff;
+      color: #fff;
+    }
+  }
+
+  .modal-content {
+    height: calc(100% - 40px);
+
+    > div {
+      float: left;
+      height: 100%;
+    }
+
+    .modalCtn-lf {
+      width: 45%;
+      border-right: 1px solid #ccc;
+
+      > div {
+        height: 100%;
+        width: 50%;
+        float: left;
+        overflow: auto;
+      }
+
+      .lf-top {
+        width: 100%;
+        height: 33px;
+        padding-left: 16px;
+        font-size: 14px;
+        line-height: 33px;
+        background-color: #efefef;
+      }
+    }
+
+    .modalCtn-rt {
+      width: 55%;
+    }
+  }
+}
+
+.client-box {
+  overflow: hidden;
+  padding: 1px;
+
+  li {
+    list-style: none;
+    float: left;
+    width: 25%;
+    height: 100px;
+    border: 1px dashed #17233d;
+    margin: 0 0 -1px -1px;
+    text-align: center;
+    line-height: 100px;
+    font-size: 22px;
+    cursor: pointer;
+
+    &:hover {
+      background-color: #2d8cf0;
+      color: #fff;
+    }
+  }
+}
+
+.screen1 {
+  overflow: hidden;
+  margin-left: 20px;
+  padding: 1px;
+
+  li {
+    list-style: none;
+    float: left;
+    width: 180px;
+    height: 180px;
+    border: 1px dashed #17233d;
+    margin: 0 0 5px 5px;
+    text-align: center;
+    line-height: 180px;
+    font-size: 22px;
+    cursor: pointer;
+
+    &:hover {
+      background-color: #2d8cf0;
+      color: #fff;
+    }
+  }
+}
+
+.screen4 {
+  overflow: hidden;
+  margin-left: 20px;
+  padding: 1px;
+
+  li {
+    list-style: none;
+    float: left;
+    width: 180px;
+    height: 180px;
+    border: 1px dashed #17233d;
+    margin: 0 0 5px 5px;
+
+    span {
+      float: left;
+      width: 50%;
+      height: 50%;
+      border: 1px dashed #17233d;
+      text-align: center;
+      line-height: 90px;
+      font-size: 22px;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #2d8cf0;
+        color: #fff;
+      }
+    }
+  }
+}
+
+.screen9 {
+  overflow: hidden;
+  margin-left: 20px;
+  padding: 1px;
+
+  li {
+    list-style: none;
+    float: left;
+    width: 180px;
+    height: 180px;
+    border: 1px dashed #17233d;
+    margin: 0 0 5px 5px;
+
+    span {
+      float: left;
+      width: calc((100% / 3));
+      height: calc((100% / 3));
+      border: 1px dashed #17233d;
+      text-align: center;
+      line-height: 60px;
+      font-size: 22px;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #2d8cf0;
+        color: #fff;
+      }
+    }
+  }
+}
+</style>
+<style lang="stylus"></style>

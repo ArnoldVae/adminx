@@ -1,0 +1,1026 @@
+<template>
+	<div>
+		<!-- 左侧树 -->
+		<!-- <div class="left-tree">
+			<search-tree :data="treeData" @on-select-change="handleStationTree" placeholder="输入关键词搜索...">
+				<Icon type="ios-search" slot="suffix" />
+			</search-tree>
+		</div>-->
+		<!-- 右侧内容 -->
+		<div class="right-content">
+			<transition name="el-fade-in-linear">
+				<div class="search-bar">
+					<searche-Header-Wrapper>
+						<form-item
+							title="预案名称"
+							type="text"
+							v-model="searchData.name"
+							placeholder="输入预案名称"
+							@on-enter="searchStation"
+							clearable
+							noMBottom
+						></form-item>
+						<form-item
+							title="类型"
+							type="select"
+							v-model="searchData.intType"
+							:options="typeList"
+							:setings="{ value: 'dictID', label: 'vcName' }"
+							noMBottom
+						></form-item>
+						<form-item
+							title="等级"
+							type="select"
+							v-model="searchData.intLevel"
+							:options="levelList"
+							:setings="{ value: 'value', label: 'label' }"
+							noMBottom
+						></form-item>
+						<Button type="info" size="large" icon="md-search" @click="searchStation">查询</Button>
+						<Button
+							class="reset"
+							type="primary"
+							size="large"
+							icon="md-refresh"
+							@click="handleResetData"
+						>重置</Button>
+						<Button type="success" size="large" icon="md-add" @click="handleModalShow()">新增</Button>
+					</searche-Header-Wrapper>
+				</div>
+			</transition>
+
+			<!-- 表格 -->
+			<div class="table-content">
+				<Table border ref="selection" :columns="tableColumns" :data="tableData" height="650"></Table>
+				<!-- 分页 -->
+				<div class="table-page">
+					<div class="page-content">
+						<Page
+							@on-change="handleChangePage"
+							@on-page-size-change="handleChangePageSize"
+							:total="total"
+							:current="page"
+							:page-size="pageSize"
+							show-elevator
+							show-total
+							show-sizer
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 新增弹窗 -->
+		<Modal
+			v-model="modalAddShow"
+			title="新增"
+			class="add-modal"
+			:mask-closable="false"
+			@on-visible-change="close"
+		>
+			<Form
+				ref="addFormRef"
+				:rules="ruleValidate"
+				:model="addFormData"
+				:label-width="100"
+				label-position="right"
+			>
+				<!-- 预案名称 -->
+				<FormItem label="预案名称" prop="vcName">
+					<Input v-model="addFormData.vcName" placeholder="请输入..." style="width: 370px" />
+				</FormItem>
+				<!-- 类型 -->
+				<FormItem label="类型" prop>
+					<!-- <Input v-model="addFormData.vcCode" placeholder="请输入..." style="width: 370px" /> -->
+					<el-select v-model="addFormData.intType" placeholder="请选择所属类型" style="width: 370px">
+						<el-option
+							v-for="(item, index) in typeList"
+							:key="index"
+							:label="item.vcName"
+							:value="item.dictID"
+						></el-option>
+					</el-select>
+				</FormItem>
+
+				<!-- 级别 -->
+				<FormItem label="级别" prop>
+					<!-- <Input v-model="addFormData.vcTelephone" placeholder="请输入..." style="width: 370px" /> -->
+					<el-select v-model="addFormData.intLevel" placeholder="请选择所属级别" style="width: 370px">
+						<el-option
+							v-for="(item, index) in levelList"
+							:key="index"
+							:label="item.label"
+							:value="item.value"
+						></el-option>
+					</el-select>
+				</FormItem>
+				<!-- 处置流程图 -->
+				<FormItem label="处置流程图">
+					<Upload
+						type="drag"
+						:before-upload="handleUpload"
+						action="https://jsonplaceholder.typicode.com/posts/"
+					>
+						<div>
+							<Icon type="ios-add-circle-outline" size="42" style="color: #3399ff"></Icon>
+							<p>选择上传图片</p>
+						</div>
+					</Upload>
+				</FormItem>
+				<!-- 备注 -->
+				<FormItem label="备注" prop>
+					<Input type="textarea" v-model="addFormData.vcMemo" placeholder="请输入..." style="width: 370px" />
+				</FormItem>
+			</Form>
+
+			<div slot="footer">
+				<el-button type="text" size="large" @click="handleModalCancel">取消</el-button>
+				<el-button type="primary" size="large" @click="handleAddStation()">确认</el-button>
+			</div>
+		</Modal>
+
+		<!-- 编辑弹窗 -->
+		<Modal
+			v-model="modaleditShow"
+			title="应急预案编辑"
+			class="edit-modal"
+			:mask-closable="false"
+			@on-visible-change="close"
+		>
+			<Form
+				ref="editFormRef"
+				:rules="ruleValidate"
+				:model="editFormData"
+				:label-width="80"
+				label-position="right"
+			>
+				<div class="search-bar">
+					<searche-Header-Wrapper>
+						<form-item
+							title="预案名称"
+							type="text"
+							v-model="editFormData.vcName"
+							placeholder="输入预案名称"
+							@on-enter="searchStation"
+							clearable
+							noMBottom
+						></form-item>
+						<form-item
+							title="类型"
+							type="select"
+							v-model="editFormData.intType"
+							:options="typeList"
+							:setings="{ value: 'dictID', label: 'vcName' }"
+							noMBottom
+						></form-item>
+						<form-item
+							title="级别"
+							type="select"
+							v-model="editFormData.intLevel"
+							:options="levelList"
+							:setings="{ value: 'value', label: 'label' }"
+							noMBottom
+						></form-item>
+					</searche-Header-Wrapper>
+				</div>
+				<div class="info">
+					<div class="info-left">
+						<el-row class="mingxi">
+							<el-col>
+								预案明细
+								<el-button
+									@click="add"
+									type="success"
+									size="small"
+									icon="el-icon-plus"
+									style="float: right"
+								>新增</el-button>
+							</el-col>
+						</el-row>
+						<div class="info-body">
+							<el-table
+								:data="editFormData.fireRpItemDtoList"
+								style="width: 100%"
+								height="300"
+								empty-text="暂无数据"
+								border
+								@row-click="rowClick"
+							>
+								<el-table-column type="index" width="30"></el-table-column>
+
+								<el-table-column prop="vcItemContext">
+									<template slot-scope="scope">
+										<el-input
+											@blur="leave(scope.row,scope.$index)"
+											type="textarea"
+											size="small"
+											v-model="plan"
+											placeholder="请输入内容"
+											v-if="scope.row.rowShow"
+										></el-input>
+										<span v-else>{{ scope.row.vcItemContext }}</span>
+									</template>
+								</el-table-column>
+								<el-table-column prop="action" label="操作" align="center" width="178">
+									<template slot-scope="scope">
+										<div>
+											<el-button
+												@click="Edit(scope.row,scope.$index)"
+												type="warning"
+												size="small"
+												icon="el-icon-edit-outline"
+											>修改</el-button>
+											<el-button
+												@click="Delete(scope, scope.$index)"
+												type="danger"
+												size="small"
+												icon="el-icon-delete"
+											>删除</el-button>
+										</div>
+									</template>
+								</el-table-column>
+							</el-table>
+						</div>
+						<Button type="info" style="margin: 0 20px" size="large" @click="up">上移</Button>
+						<Button type="primary" size="large" @click="down">下移</Button>
+					</div>
+					<div class="info-right">
+						<el-row>
+							<el-col>操作流程图</el-col>
+						</el-row>
+						<div class="info-right-bottom">
+							<Upload
+								type="drag"
+								:before-upload="handleUpload"
+								action="https://jsonplaceholder.typicode.com/posts/"
+							>
+								<div>
+									<img :src="editFormData.vcPictureAbsDir" alt />
+									<!-- <img src="../../assets/img/bg-border3.png" alt /> -->
+								</div>
+							</Upload>
+						</div>
+					</div>
+				</div>
+			</Form>
+			<div slot="footer" style="text-align:center">
+				<Button type="info" style="margin-right: 20px" size="large" @click="planCancel">取消</Button>
+				<Button type="primary" size="large" @click="planSave">保存</Button>
+			</div>
+		</Modal>
+	</div>
+</template>
+<script>
+import { clearInterval } from 'timers'
+// import maps from './newMap'
+export default {
+	name: 'fire-part',
+	components: {},
+	props: {},
+	data() {
+		return {
+			forData: [],
+			file: {},
+			infoList: '',
+			infoLists: [],
+			fileList: [],
+			// 搜索下拉框
+			typeList: [],
+			levelList: [
+				// 搜索下拉框
+				{
+					value: '1',
+					label: '一级'
+				},
+				{
+					value: '2',
+					label: '二级'
+				},
+				{
+					value: '3',
+					label: '三级'
+				}
+			],
+			searchData: {
+				name: '',
+				intType: '',
+				intLevel: ''
+			}, // 维保单位名称
+			axios: this.$api.contingencyPlan,
+			treeData: [],
+			unitId: '',
+			orgId: '',
+			isTree: false,
+			isFile: false,
+			stationName: '',
+			modalShow: false,
+			modalAddShow: false,
+			modaleditShow: false,
+			step: 0,
+			file: null,
+			accept: '.svg',
+			Format: ['.svg'],
+			tableColumns: [
+				{
+					title: '预案名称',
+					key: 'vcName',
+					align: 'center',
+					maxWidth: 200
+				},
+				{
+					title: '类型',
+					key: 'typeStr',
+					align: 'center',
+					width: 200
+				},
+				{
+					title: '级别',
+					key: 'levelStr',
+					width: 200,
+					align: 'center'
+					// render: (h, params) => {
+					// 	return h('div', [params.row.isEnable == '1' ? h('p', params.row.isEnable1) : h('b', params.row.isEnable1)])
+					// }
+				},
+				{
+					title: '处置流程图',
+					key: 'vcPicture',
+					align: 'center',
+					minWidth: 150
+				},
+				// {
+				// 	title: '标识',
+				// 	key: 'flag',
+				// 	width: 80,
+				// 	align: 'center'
+				// },
+				{
+					title: '备注',
+					key: 'vcMemo',
+					width: 200,
+					align: 'center'
+				},
+				{
+					title: '操作',
+
+					key: 'action',
+					align: 'center',
+					width: 230,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										icon: 'ios-create-outline'
+									},
+									on: {
+										click: () => {
+											this.editModalShow(params)
+										}
+									}
+								},
+								'编辑'
+							),
+							h(
+								'Button',
+								{
+									props: {
+										type: 'error',
+										icon: 'md-trash'
+									},
+									on: {
+										click: () => {
+											this.handleRemove(params)
+										}
+									}
+								},
+								'删除'
+							)
+						])
+					}
+				}
+			],
+			tableData: [],
+			// 表单验证
+			ruleValidate: {
+				vcName: [{ required: true, message: '该项为必填项', trigger: 'blur' }, { pattern: /^.{0,100}$/, message: '最多输入100字', trigger: 'change' }]
+				// vcCode: [{ required: true, message: '该项为必填项', trigger: 'blur' }, { pattern: /^.{0,100}$/, message: '最多输入100字', trigger: 'change' }],
+				// vcAddress: [
+				// 	{ required: true, message: '该项为必填项', trigger: 'blur' },
+				// 	{ pattern: /^.{0,100}$/, message: '最多输入100字', trigger: 'change' }
+				// ]
+			},
+			// 添加的表单数据
+			addFormData: {
+				frpid: '',
+				vcName: '',
+				intType: '',
+				intLevel: '',
+				vcMemo: '',
+				vcPicture: ''
+			},
+			//编辑表单数据
+			editFormData: {},
+			planData: [],
+			options: [],
+			plan: '',
+			// 分页信息
+			total: 3,
+			page: 1,
+			pageSize: 20,
+			modalShow: false
+
+			// modalTitle: '新增'
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {},
+	created() {
+		this.getDate()
+		this.getTable()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		//点击表格
+		rowClick(row) {
+			this.isCurrent = true
+			this.forData = row
+		},
+		//上移
+		up() {
+			if (this.forData.length == 0) {
+				this.$Message.info({
+					content: '请点击列表信息!!!',
+					duration: 3
+				})
+			} else {
+				let index = this.editFormData.fireRpItemDtoList.findIndex((item,index) => {
+					return item == this.forData
+				})
+				console.log(index)
+				if(index-1 >= 0) {
+					let temp = this.editFormData.fireRpItemDtoList[index]
+					this.$set(this.editFormData.fireRpItemDtoList,index,this.editFormData.fireRpItemDtoList[index-1])
+					this.$set(this.editFormData.fireRpItemDtoList,index-1,temp)
+
+				}
+			}
+		},
+		//上移
+		down() {
+			if (this.forData.length == 0) {
+				this.$Message.info({
+					content: '请点击列表信息!!!',
+					duration: 3
+				})
+			} else {
+				let index = this.editFormData.fireRpItemDtoList.findIndex((item,index) => {
+					return item == this.forData
+				})
+				if(index+1 <= this.editFormData.fireRpItemDtoList.length - 1) {
+					let temp = this.editFormData.fireRpItemDtoList[index]
+					this.$set(this.editFormData.fireRpItemDtoList,index,this.editFormData.fireRpItemDtoList[index+1])
+					this.$set(this.editFormData.fireRpItemDtoList,index+1,temp)
+				}
+			}
+		},
+		//取消
+		planCancel() {
+			this.modaleditShow = false
+		},
+		//修改保存
+		async planSave() {
+			//验证成功，掉接口提交数据
+			let formData = new FormData()
+			formData.append('file', this.file)
+			formData.append('vcName', this.editFormData.vcName)
+			formData.append('intType', this.editFormData.intType)
+			formData.append('intLevel', this.editFormData.intLevel)
+			formData.append('id', parseInt(this.editFormData.id))
+			formData.append('frpid', this.editFormData.frpid)
+			console.log(this.editFormData.fireRpItemDtoList)
+			// let array = []
+			this.editFormData.fireRpItemDtoList.forEach((item,index) => {
+				let obj = {
+					frpid: item.frpid || +new Date(),
+					id: item.id,
+					intFlag: item.intFlag,
+					intSort: item.intSort,
+					vcItemContext: item.vcItemContext,
+					vcMemo: item.vcMemo
+				}
+				// item = obj
+				array.push(obj)
+				
+				// console.log(item)
+				
+				
+			})
+			console.log(array)
+			formData.append('fireRpItemDtoList', JSON.stringify(array))
+			
+			let res = await this.axios.editTableDate(formData)
+			if (res.success) {
+				this.getTable()
+				this.modalEditShow = false
+			}
+		},
+		//删除应急预案
+		Delete(row, index) {
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除所选项?',
+				onOk: () => {
+					this.editFormData.fireRpItemDtoList.splice(index, 1)
+				},
+				onCancel: () => {}
+			})
+		},
+		//修改应急预案
+		Edit(row, index) {
+			this.editFormData.fireRpItemDtoList.forEach((item, idx) => {
+				if (item.rowShow) {
+					this.editFormData.fireRpItemDtoList[idx].rowShow = false
+				}
+			})
+
+			this.plan = row.vcItemContext
+			this.editFormData.fireRpItemDtoList[index].rowShow = true
+		},
+		//失去焦点
+		leave(item, index) {
+			this.editFormData.fireRpItemDtoList[index].vcItemContext = this.plan //应急预案
+			this.editFormData.fireRpItemDtoList[index].rowShow = false
+			console.log(this.editFormData.fireRpItemDtoList)
+		},
+		//新增预案
+		add() {
+			this.editFormData.fireRpItemDtoList.forEach((item, idx) => {
+				if (item.rowShow) {
+					this.editFormData.fireRpItemDtoList[idx].rowShow = false
+				}
+			})
+			this.editFormData.fireRpItemDtoList.push({
+				plan: '',
+				rowShow: true
+			})
+			this.plan = ''
+		},
+		// 查询
+		searchStation() {
+			this.getTable()
+		},
+		// 重置
+		handleResetData() {
+			this.searchData.name = ''
+			this.searchData.intType = ''
+			this.searchData.intLevel = ''
+			this.getTable()
+		},
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+		//获取所有消防类型
+		getDate() {
+			this.axios.getContingencyPlanDate({ dictGroupID: 9004 }).then(res => {
+				if (res.code == 200) {
+					this.typeList = res.data.lists[0].dictDataList
+				}
+			})
+		},
+
+		// 获取表格数据列表
+		getTable() {
+			let params = {
+				currentPage: this.page,
+				pageSize: this.pageSize,
+				vcName: this.searchData.vcName,
+				intType: this.searchData.intType,
+				intLevel: this.searchData.intLevel
+			}
+			this.axios.getTableList(params).then(res => {
+				if (res.code == 200) {
+					res.data.forEach((item, index) => {
+						item.fireRpItemDtoList.forEach((subItem, i) => {
+							subItem['rowShow'] = false
+						})
+					})
+					this.tableData = res.data
+					this.total = res.data.total
+					console.log(this.tableData)
+				}
+			})
+		},
+		// 删除
+		handleRemove(params) {
+			console.log(params)
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除所选项?',
+				onOk: () => {
+					this.axios.delTableDate({ id: params.row.id }).then(res => {
+						if (res.code == 200) {
+							this.$Message.success('删除成功')
+							this.page = 1
+							this.getTable()
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+				},
+				onCancel: () => {}
+			})
+		},
+		//编辑按钮
+		editModalShow(params) {
+			this.modaleditShow = true
+			this.editFormData = params.row
+			console.log(this.editFormData)
+			console.log(this.editFormData.vcPicture)
+		},
+		// 添加按钮
+		handleModalShow() {
+			this.modalAddShow = true
+		},
+
+		//确认添加按钮
+		handleAddStation() {
+			console.log(this.file)
+			// 新增
+			this.$refs.addFormRef.validate(async valid => {
+				if (!valid) return
+				//验证成功，掉接口提交数据
+				let formData = new FormData()
+				formData.append('file', this.file)
+				formData.append('vcName', this.addFormData.vcName)
+				formData.append('intType', this.addFormData.intType)
+				formData.append('intLevel', this.addFormData.intLevel)
+				formData.append('vcMemo', this.addFormData.vcMemo)
+				// console.log(formData)
+				let res = await this.axios.addTableDate(formData)
+				if (res.success) {
+					this.getTable()
+					this.modalAddShow = false
+				}
+			})
+		},
+		//取消按钮
+		handleModalCancel() {
+			this.$refs.addFormRef.resetFields()
+			this.modalAddShow = false
+		},
+		//关闭对话框
+		close() {
+			this.$refs.addFormRef.resetFields()
+			this.addFormData.intType = ''
+			this.addFormData.intLevel = ''
+			this.fileList = []
+			this.addFormData.vcMemo = ''
+		},
+		// 地图弹窗
+		showMpa() {
+			this.showM = !this.showM
+		},
+		// 分页切换
+		handleChangePage(page) {
+			this.page = page
+			this.getTable()
+		},
+		// 分页条数
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getTable()
+		},
+
+		handlePreview(file) {
+			console.log(file)
+		},
+		handleUpload(file) {
+			this.file = file
+		},
+
+		addInfoLists() {
+			if (this.infoList) {
+				this.infoLists.push(this.infoList)
+			}
+			this.infoList = ''
+			console.log(this.infoLists)
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.fire-part {
+  width: 100%;
+
+  // height: calc(100vh - 160px);
+  .left-tree {
+    width: 240px;
+    height: calc(100vh - 194px);
+    background-color: #fff;
+    border: 10px solid #fff;
+    overflow: auto;
+    float: left;
+  }
+
+  .right-content {
+    width: calc(100% - 250px);
+    height: 100%;
+    float: left;
+    margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+
+    .tool-bar {
+      .btn-box {
+        .ivu-btn {
+          margin-right: 10px;
+        }
+      }
+    }
+
+    .table-content {
+      width: 100%;
+
+      // flex: 1;
+      // position: relative;
+      /deep/ .ivu-table-wrapper {
+        height: calc(100vh - 268px) !important;
+
+        .ivu-table-body, .ivu-table-overflowY, .ivu-table-tip, .ivu-table-tip td {
+          height: calc(100vh - 270px) !important;
+        }
+      }
+
+      // /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+      // height: calc(100% - 40px) !important;
+      // }
+      /deep/.ivu-table {
+        p {
+          color: #19be6b;
+        }
+
+        b {
+          font-weight: 400;
+          color: #ff9900;
+        }
+
+        i {
+          font-style: normal;
+        }
+      }
+
+      /deep/tr.ivu-table-row-hover td {
+        background-color: #F5F7FA;
+      }
+
+      /deep/.ivu-btn {
+        font-size: 14px;
+      }
+
+      .table-page {
+        width: 100%;
+        position: absolute;
+        bottom: 20px;
+
+        .page-content {
+          width: 800px;
+          margin-left: 50%;
+          transform: translateX(-50%);
+        }
+      }
+    }
+  }
+}
+
+.upload-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+
+  .steps {
+    margin-left: 30px;
+    margin-bottom: 30px;
+  }
+
+  .up-box {
+    margin-left: 50px;
+    font-size: 16px;
+    color: #515a6e;
+    margin-top: 30px;
+
+    span {
+      font-size: 16px;
+      margin-top: 10px;
+      color: #464c5b;
+      font-weight: 700;
+      display: block;
+
+      .del {
+        float: left;
+        display: inline-block;
+        width: 30px;
+        text-align: center;
+        font-size: 18px;
+        line-height: 100%;
+        color: #2b85e4;
+        cursor: pointer;
+
+        &:hover {
+          color: #ed4014;
+        }
+      }
+    }
+  }
+
+  .btn1 {
+    width: 400px;
+    margin: 10px 10px 10px 50px;
+  }
+}
+
+.axis-form-item {
+  .icon-wrapper {
+    width: 80px;
+    height: 32px;
+    flex-align(center, center);
+    margin-left: 10px;
+
+    .ivu-icon {
+      font-size: 24px;
+      cursor: pointer;
+
+      &:hover {
+        color: #2d8cf0;
+      }
+    }
+  }
+
+  /deep/.ivu-form-item-content {
+    display: flex;
+
+    .ivu-input-wrapper {
+      &:first-of-type {
+        margin-right: 10px;
+      }
+    }
+  }
+}
+
+/deep/ .ivu-btn-error {
+  margin-left: 10px;
+}
+
+.reset {
+  margin: 0 10px;
+}
+
+.edit-modal {
+  /deep/ .ivu-modal {
+    width: 1406px !important;
+
+    .ivu-modal-content {
+      height: 800px !important;
+      position: relative;
+
+      .ivu-modal-footer {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 100%;
+      }
+    }
+  }
+}
+
+// /deep/ .ivu-modal-header {
+// background-color: #4e89bb;
+// color: #fff;
+// }
+/deep/ .el-table thead {
+  display: none;
+}
+
+/deep/ .ivu-modal-content {
+  top: -50px !important;
+}
+
+.info {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid #ccc;
+  padding: 10px;
+  height: 600px;
+
+  /deep/ .ivu-upload-drag {
+    height: 534px !important;
+    padding: 5px;
+
+    img {
+      height: 524px;
+      width: 100%;
+    }
+  }
+
+  /deep/ .ivu-upload-list-file {
+    display: none;
+  }
+
+  .info-left {
+    width: 64%;
+    // height: 200px;
+    border: 1px solid #ccc;
+
+    .mingxi {
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+      font-weight: 700;
+      font-size: 14px;
+      background-color: #4e89bb;
+      color: #fff;
+
+      .el-col {
+        line-height: 32px;
+      }
+    }
+
+    .info-body {
+      height: 85%;
+
+      .el-table {
+        height: 98% !important;
+      }
+
+      /deep/ textarea.ivu-input {
+        border: none !important;
+        outline: none !important;
+        border-left: 1px solid #ccc !important;
+      }
+
+      .el-col:first-child {
+        text-align: center;
+        height: 100%;
+        width: 58.25px;
+
+        // line-height: 50px;
+        button {
+          width: 100%;
+        }
+      }
+
+      .el-row {
+        height: 100%;
+        border: 1px solid #ccc !important;
+      }
+    }
+  }
+
+  .info-right {
+    width: 34%;
+    // height: 200px;
+    border: 1px solid #ccc;
+
+    .el-row {
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+      font-weight: 700;
+      font-size: 14px;
+      background-color: #4e89bb;
+      color: #fff;
+
+      .el-col {
+        line-height: 32px;
+      }
+    }
+  }
+}
+</style>

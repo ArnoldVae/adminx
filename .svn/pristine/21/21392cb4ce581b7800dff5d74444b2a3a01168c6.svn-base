@@ -1,0 +1,433 @@
+import Main from '../view/main'
+import parentView from '_c/parent-view'
+
+/**
+ * iview-admin中meta除了原生参数外可配置的参数:
+ * meta: {
+ *  title: { String|Number|Function }
+ *         显示在侧边栏、面包屑和标签栏的文字
+ *         使用'{{ 多语言字段 }}'形式结合多语言使用，例子看多语言的路由配置;
+ *         可以传入一个回调函数，参数是当前路由对象，例子看动态路由和带参路由
+ *  hideInBread: (false) 设为true后此级路由将不会出现在面包屑中，示例看QQ群路由配置
+ *  hideInMenu: (false) 设为true后在左侧菜单不会显示该页面选项
+ *  notCache: (false) 设为true后页面在切换标签后不会缓存，如果需要缓存，无需设置这个字段，而且需要设置页面组件name属性和路由配置的name一致
+ *  access: (null) 可访问该页面的权限数组，当前路由设置的权限会影响子路由
+ *  icon: (-) 该页面在左侧菜单、面包屑和标签导航处显示的图标，如果是自定义图标，需要在图标名称前加下划线'_'
+ *  beforeCloseName: (-) 设置该字段，则在关闭当前tab页时会去'@/router/before-close.js'里寻找该字段名对应的方法，作为关闭前的钩子函数
+ * }
+ */
+
+export default [
+	{
+		path: '/login',
+		name: 'login',
+		meta: {
+			title: 'Login - 登录',
+			hideInMenu: true
+		},
+		component: () => import('../view/login/login.vue')
+	},
+	{
+		path: '/',
+		name: '_home',
+		redirect: '/home',
+		component: Main,
+		meta: {
+			hideInMenu: true,
+			notCache: true
+		},
+		children: [
+			{
+				path: '/home',
+				name: 'home',
+				meta: {
+					hideInMenu: true,
+					title: '首页',
+					notCache: true,
+					icon: 'md-home'
+				},
+				component: () => import('../view/single-page/home')
+			}
+		]
+	},
+	{
+		path: '/message',
+		name: 'message',
+		component: Main,
+		meta: {
+			hideInBread: true,
+			hideInMenu: true
+		},
+		children: [
+			{
+				path: 'message_page',
+				name: 'message_page',
+				meta: {
+					icon: 'md-notifications',
+					title: '消息中心'
+				},
+				component: () => import('../view/single-page/message/index.vue')
+			}
+		]
+	},
+	/*{
+		path: '/components',
+		name: 'components',
+		meta: {
+			icon: 'logo-buffer',
+			title: '组件'
+		},
+		component: Main,
+		children: [
+			{
+				path: 'tree_select_page',
+				name: 'tree_select_page',
+				meta: {
+					icon: 'md-arrow-dropdown-circle',
+					title: '树状下拉选择器'
+				},
+				component: () => import('../view/components/tree-select/index.vue')
+			},
+			{
+				path: 'drag_drawer_page',
+				name: 'drag_drawer_page',
+				meta: {
+					icon: 'md-list',
+					title: '可拖拽抽屉'
+				},
+				component: () => import('../view/components/drag-drawer')
+			},
+			{
+				path: 'org_tree_page',
+				name: 'org_tree_page',
+				meta: {
+					icon: 'ios-people',
+					title: '组织结构树'
+				},
+				component: () => import('../view/components/org-tree')
+			},
+			{
+				path: 'split_pane_page',
+				name: 'split_pane_page',
+				meta: {
+					icon: 'md-pause',
+					title: '分割窗口'
+				},
+				component: () => import('../view/components/split-pane/split-pane.vue')
+			},
+			{
+				path: 'markdown_page',
+				name: 'markdown_page',
+				meta: {
+					icon: 'logo-markdown',
+					title: 'Markdown编辑器'
+				},
+				component: () => import('../view/components/markdown/markdown.vue')
+			},
+			{
+				path: 'editor_page',
+				name: 'editor_page',
+				meta: {
+					icon: 'ios-create',
+					title: '富文本编辑器'
+				},
+				component: () => import('../view/components/editor/editor.vue')
+			},
+			{
+				path: 'icons_page',
+				name: 'icons_page',
+				meta: {
+					icon: '_bear',
+					title: '自定义图标'
+				},
+				component: () => import('../view/components/icons/icons.vue')
+			}
+		]
+	},*/
+	{
+		path: '/error_logger',
+		name: 'error_logger',
+		meta: {
+			hideInBread: true,
+			hideInMenu: true
+		},
+		component: Main,
+		children: [
+			{
+				path: 'error_logger_page',
+				name: 'error_logger_page',
+				meta: {
+					icon: 'ios-bug',
+					title: '错误收集'
+				},
+				component: () => import('../view/single-page/error-logger.vue')
+			}
+		]
+	},
+	{
+		path: '/argu',
+		name: 'argu',
+		meta: {
+			hideInMenu: true
+		},
+		component: Main,
+		children: [
+			{
+				path: 'params/:id',
+				name: 'params',
+				meta: {
+					icon: 'md-flower',
+					title: route => `{{ params }}-${route.params.id}`,
+					notCache: true,
+					beforeCloseName: 'before_close_normal'
+				},
+				component: () => import('../view/argu-page/params.vue')
+			},
+			{
+				path: 'query',
+				name: 'query',
+				meta: {
+					icon: 'md-flower',
+					title: route => `{{ query }}-${route.query.id}`,
+					notCache: true
+				},
+				component: () => import('../view/argu-page/query.vue')
+			}
+		]
+	},
+	{
+		path: '/401',
+		name: 'error_401',
+		meta: {
+			hideInMenu: true
+		},
+		component: () => import('../view/error-page/401.vue')
+	},
+	{
+		path: '/500',
+		name: 'error_500',
+		meta: {
+			hideInMenu: true
+		},
+		component: () => import('../view/error-page/500.vue')
+	},
+	{
+		path: '*',
+		name: 'error_404',
+		meta: {
+			hideInMenu: true
+		},
+		component: () => import('../view/error-page/404.vue')
+	},
+	{
+		path: '/device-config',
+		name: 'device-config',
+		meta: {
+			hideInBread: true,
+			icon: 'md-construct'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'device-config-page',
+				name: 'device-config-page',
+				meta: {
+					title: '装置配置',
+					icon: 'md-construct'
+				},
+				component: () => import('../view/device-config/index.vue')
+			}
+		]
+	},
+	{
+		path: '/measuring-upload',
+		name: 'measuring-upload',
+		meta: {
+			hideInBread: true,
+			icon: 'md-disc'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'measuring-upload-page',
+				name: 'measuring-upload-page',
+				meta: {
+					title: '测点导入',
+					icon: 'md-disc'
+				},
+				component: () => import('../view/measuring-upload')
+			}
+		]
+	},
+	{
+		path: '/svg-upload',
+		name: 'svg-upload',
+		meta: {
+			hideInBread: true,
+			icon: 'md-document'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'svg-upload-page',
+				name: 'svg-upload-page',
+				meta: {
+					title: 'SVG图导入',
+					icon: 'md-document'
+				},
+				component: () => import('../view/svg-config')
+			}
+		]
+	},
+	{
+		path: '/fire-part',
+		name: 'fire-part',
+		meta: {
+			hideInBread: true,
+			icon: 'md-home'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'fire-part-page',
+				name: 'fire-part-page',
+				meta: {
+					title: '消防单位',
+					icon: 'md-home'
+				},
+				component: () => import('../view/fire-part')
+			}
+		]
+	},
+	{
+		path: '/protect-zone',
+		name: 'protect-zone',
+		meta: {
+			hideInBread: true,
+			icon: 'md-star'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'protect-zone-page',
+				name: 'protect-zone-page',
+				meta: {
+					title: '防护区',
+					icon: 'md-star'
+				},
+				component: () => import('../view/protect-zone')
+			}
+		]
+	},
+	{
+		path: '/fire-linkage-config',
+		name: 'fire-linkage-config',
+		meta: {
+			hideInBread: true,
+			icon: 'md-build'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'fire-linkage-config-page',
+				name: 'fire-linkage-config-page',
+				meta: {
+					title: '报警联动',
+					icon: 'md-build'
+				},
+				component: () => import('../view/fire-linkage-config')
+			}
+		]
+	},
+	{
+		path: '/systems-manage',
+		name: 'systems-manage',
+		meta: {
+			title: '消防配置',
+			icon: 'ios-albums-outline'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: '/svg-flow-config',
+				name: 'svg-flow-config',
+				meta: {
+					title: 'svg流程图配置',
+					icon: 'ios-map-outline'
+				},
+				component: () => import('../view/svg-flow-config')
+			}
+		]
+	},
+
+	{
+		path: '/systems-manage',
+		name: 'systems-manage',
+		meta: {
+			title: '消防配置',
+			icon: 'ios-albums-outline'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'maintenance-person',
+				name: 'maintenance-person',
+				meta: {
+					title: '维保单位管理',
+					icon: 'md-person'
+				},
+				component: () => import('../view/maintenance-person')
+			}
+		]
+	},
+	{
+		path: '/systems-manage',
+		name: 'systems-manage',
+		meta: {
+			title: '消防配置',
+			icon: 'ios-albums-outline'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'contingency-plan',
+				name: 'contingency-plan',
+				meta: {
+					title: '应急预案管理',
+					icon: 'md-cube'
+				},
+				component: () => import('../view/contingency-plan')
+			}
+		]
+	},
+	{
+		path: '/systems-manage',
+		name: 'systems-manage',
+		meta: {
+			title: '消防配置',
+			icon: 'ios-albums-outline'
+		},
+		component: Main,
+		children: [
+			// 一个以上才展示父级菜单
+			{
+				path: 'maintenance-plan',
+				name: 'maintenance-plan',
+				meta: {
+					title: '维保计划',
+					icon: 'md-plane'
+				},
+				component: () => import('../view/maintenance-plan')
+			}
+		]
+	}
+]

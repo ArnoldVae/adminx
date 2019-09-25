@@ -1,0 +1,256 @@
+<template>
+	<div class="table-expand">
+		<Button size="small" type="success" icon="md-add" class="add" @click="handleOpenAddModalSingle">添加</Button>
+		<Button size="small" type="error" icon="md-trash" class="delete" @click="handleDeleteDicts">批量删除</Button>
+
+		<Table
+			@on-select="handleSelect"
+			@on-select-cancel="handleSelectCancel"
+			@on-select-all="handleSelectAll"
+			@on-select-all-cancel="handleSelectAllCancel"
+			border
+			highlight-row
+			:columns="columns"
+			:data="rowData"
+			height="500"
+		>
+			<template slot-scope="{ row }" slot="isEnable">
+				<span v-if="row.isEnable == 1" :style="{ color: '#19be6b' }">启用</span>
+				<span v-if="row.isEnable == 0" :style="{ color: '#ff9900' }">禁用</span>
+			</template>
+			<template slot-scope="{ row }" slot="action">
+				<Button size="small" type="warning" icon="ios-create-outline" @click="handleOpenAddModalEdit(row)">编辑</Button>
+				<Button size="small" type="error" icon="ios-trash" class="delete" @click="handleDeleteDict(row)">删除</Button>
+			</template>
+		</Table>
+	</div>
+</template>
+<script>
+import { findComponentUpward } from '@/libs/assist'
+export default {
+	name: 'table-expand',
+	props: {
+		rowData: Array,
+		rowIndex: Number
+	},
+	data() {
+		return {
+			$_dataDict: null,
+			// 表格相关
+			columns: [
+				{
+					type: 'selection',
+					width: 60,
+					align: 'center'
+				},
+				{
+					title: '字典编号',
+					key: 'dictID',
+					align: 'center'
+				},
+				{
+					title: '名称',
+					key: 'vcName',
+					align: 'center'
+				},
+				{
+					title: '是否启用',
+					slot: 'isEnable',
+					align: 'center'
+				},
+				{
+					title: '标识',
+					key: 'flag',
+					align: 'center'
+				},
+				{
+					title: '备注',
+					key: 'vcMemo',
+					align: 'center'
+				},
+				{
+					title: '排序',
+					key: 'sort',
+					align: 'center'
+				},
+				{
+					title: '操作',
+					slot: 'action',
+					align: 'center',
+					width: 200
+				}
+			],
+			selectionRow: [],
+			currentRow: null
+		}
+	},
+	created() {
+		/**
+		 * $_dataDict $_作为前缀+组件name驼峰写法 获取目标组件本身
+		 * !!使用此属性 方便组件快速通讯 但是前提必须是不重用的业务组件
+		 */
+		this.$_dataDict = findComponentUpward(this, 'data-dict')
+	},
+	methods: {
+		// 添加字典
+		handleOpenAddModalSingle() {
+			this.$set(this.$_dataDict.modalInfo, 'enable', 1)
+			this.$set(this.$_dataDict.modalInfo, 'groupName', this.$_dataDict.tableData[this.rowIndex]['vcName'])
+			this.$set(this.$_dataDict.modalInfo, 'number', this.$_dataDict.tableData[this.rowIndex]['dictGroupID'])
+			this.$set(this.$_dataDict.modalInfo, 'sort', this.$_dataDict.tableData[this.rowIndex]['sort'])
+			this.$_dataDict.addAndEditModal = true
+			this.$_dataDict.currentAction = 'single'
+			this.$_dataDict.currentActionTite = '添加字典'
+			this.$_dataDict.currentSourceIndex = this.rowIndex
+		},
+		// 编辑字典
+		handleOpenAddModalEdit(row) {
+			this.currentRow = row
+			this.$set(this.$_dataDict.modalInfo, 'groupName', this.$_dataDict.tableData[this.rowIndex]['vcName'])
+			this.$set(this.$_dataDict.modalInfo, 'number', this.$_dataDict.tableData[this.rowIndex]['dictGroupID'])
+			this.$set(this.$_dataDict.modalInfo, 'name', row.vcName)
+			this.$set(this.$_dataDict.modalInfo, 'enable', row.isEnable)
+			this.$set(this.$_dataDict.modalInfo, 'identification', row.flag)
+			this.$set(this.$_dataDict.modalInfo, 'sort', row.sort)
+			this.$set(this.$_dataDict.modalInfo, 'remark', row.vcMemo)
+			this.$_dataDict.addAndEditModal = true
+			this.$_dataDict.currentAction = 'single'
+			this.$_dataDict.currentActionTite = '编辑字典'
+			this.$_dataDict.currentSourceIndex = this.rowIndex
+		},
+		// --- ROW选择处理 ---
+		selectionTemp(selection) {
+			this.selectionRow = []
+			selection.map(item => {
+				this.selectionRow.push(item.dictID)
+			})
+		},
+		handleSelect(selection, row) {
+			this.selectionTemp(selection, row)
+		},
+		handleSelectCancel(selection, row) {
+			this.selectionTemp(selection, row)
+		},
+		handleSelectAll(selection) {
+			this.selectionTemp(selection)
+		},
+		handleSelectAllCancel(selection) {
+			this.selectionTemp(selection)
+		},
+		// 新增数据字典
+		async addDataDict(index) {
+			try {
+				let result = await this.$api.dataDict.addDataDict({
+					dictGroupID: this.$_dataDict.modalInfo.number,
+					vcName: this.$_dataDict.modalInfo.name,
+					isEnable: this.$_dataDict.modalInfo.enable,
+					flag: this.$_dataDict.modalInfo.identification,
+					sort: this.$_dataDict.modalInfo.sort,
+					vcMemo: this.$_dataDict.modalInfo.remark,
+					type: 0
+				})
+				if (result.code == 200) {
+					this.$Message.success('新增成功')
+					await this.$_dataDict.getDataDictList()
+					this.$set(this.$_dataDict.tableData[index], '_expanded', true)
+				} else {
+					this.$Message.error('新增失败')
+				}
+			} catch(e) {
+				this.$Message.error(`${e}`)
+			}
+		},
+		// 删除数据字典相关HTTP
+		async deleteDataDict() {
+			try {
+				let result = await this.$api.dataDict.deleteDataDict(this.selectionRow)
+				if (result.code == 200) {
+					this.$Message.success('删除成功')
+					await this.$_dataDict.getDataDictList()
+					this.$set(this.$_dataDict.tableData[this.rowIndex], '_expanded', true)
+				} else {
+					this.$Message.error('删除失败')
+				}
+			} catch(e) {
+				this.$Message.error(`${e}`)
+			}
+		},
+		// 批量删除
+		handleDeleteDicts(row) {
+			if (this.selectionRow.length == 0) {
+				return this.$Message.error('请选中字典进行操作！')
+			}
+			this.$Modal.confirm({
+				title: '警告',
+				content: '确认删除吗？',
+				onOk: () => {
+					this.deleteDataDict()
+				}
+			})
+		},
+		// 单个删除
+		handleDeleteDict(row) {
+			if(row.isEnable == 1){
+				return this.$Message.warning('当前字典已启用！！！')
+			}
+			this.selectionRow = []
+			this.selectionRow.push(row.dictID)
+			this.$Modal.confirm({
+				title: '警告',
+				content: '确认删除吗？',
+				onOk: () => {
+					this.deleteDataDict()
+				}
+			})
+		},
+		// 编辑数据字典相关HTTP
+		async editDataDict(index) {
+			try {
+				let currentEnable = ''
+				if (this.$_dataDict.modalInfo.enable != 'all') {
+					currentEnable = this.$_dataDict.modalInfo.enable
+				}
+				let result = await this.$api.dataDict.editDataDict({
+					dictID: this.currentRow.dictID,
+					vcName: this.$_dataDict.modalInfo.name,
+					isEnable: currentEnable,
+					flag: this.$_dataDict.modalInfo.identification,
+					sort: this.$_dataDict.modalInfo.sort,
+					vcMemo: this.$_dataDict.modalInfo.remark,
+					type: 0
+				})
+				if (result.code == 200) {
+					this.$Message.success('编辑成功')
+					await this.$_dataDict.getDataDictList()
+					this.$set(this.$_dataDict.tableData[index], '_expanded', true)
+				} else {
+					this.$Message.error('编辑失败')
+				}
+			} catch(e) {
+				this.$Message.error(`${e}`)
+			}
+		}
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.table-expand {
+    overflow-y: auto;
+    .add,.delete {
+        margin: 5px
+    }
+    .ivu-table-wrapper {
+        height: initial!important;
+        /deep/ .ivu-table-body,
+        /deep/ .ivu-table-overflowY,
+        /deep/ .ivu-table-tip,
+        /deep/ .ivu-table-tip td {
+            height: initial!important;
+        }
+        /deep/ .ivu-table-tip,
+        /deep/ .ivu-table-tip td {
+            height: 48px!important;
+        }
+    }
+}
+</style>

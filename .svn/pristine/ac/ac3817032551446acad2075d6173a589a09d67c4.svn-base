@@ -1,0 +1,12 @@
+import axios from '@/config/api.request'
+
+export default {
+	// 获取站点树
+	getVideoList(params) {
+		return axios.request({
+			url: 'dev_info/find',
+			method: 'post',
+			data: params
+		})
+	}
+}

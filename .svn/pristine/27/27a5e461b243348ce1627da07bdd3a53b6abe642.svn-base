@@ -1,0 +1,1069 @@
+<template>
+	<div>
+		<div class="right-content">
+			<transition name="el-fade-in-linear">
+				<div class="search-bar">
+					<searche-Header-Wrapper>
+						<form-item
+							title="维保单位"
+							type="text"
+							v-model="searchData.vcName"
+							placeholder="输入维保单位"
+							@on-enter="searchStation"
+							clearable
+							noMBottom
+						></form-item>
+
+						<Button type="info" size="large" icon="md-search" @click="searchStation">查询</Button>
+						<Button
+							class="reset"
+							type="primary"
+							size="large"
+							icon="md-refresh"
+							@click="handleResetData"
+						>重置</Button>
+						<Button type="success" size="large" icon="md-add" @click="handleModalShow(0)">新增维保单位</Button>
+						<Button
+							type="success"
+							size="large"
+							icon="md-construct"
+							@click="deployUnit"
+							style="margin: 0 10px"
+						>配置维保变电站</Button>
+					</searche-Header-Wrapper>
+				</div>
+			</transition>
+
+			<!-- 表格 -->
+			<div class="table-content">
+				<Table
+					border
+					ref="selection"
+					:columns="tableColumns"
+					:data="tableData"
+					height="650"
+					@on-row-click="rowClick"
+				></Table>
+
+				<!-- 分页 -->
+				<div class="table-page" style="text-align: center;">
+					<div class="page-content">
+						<Page
+							@on-change="handleChangePage"
+							@on-page-size-change="handleChangePageSize"
+							:total="total"
+							:current="page"
+							:page-size="pageSize"
+							show-elevator
+							show-total
+							show-sizer
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 配置维保变电站弹窗 -->
+		<Modal
+			v-model="selectUnitShow"
+			:title="unitName+'(单位)维保变电站配置'"
+			class="unit-modal"
+			:mask-closable="false"
+			@on-visible-change="closeUnitShow"
+		>
+			<div class="unitInfo">
+				<div class="unitInfo-header">变电站信息</div>
+				<div class="unitInfo-body">
+					<el-tree
+						:data="data"
+						show-checkbox
+						node-key="id"
+						:default-expanded-keys="[1,2, 3]"
+						:default-checked-keys="[]"
+						:props="defaultProps"
+					></el-tree>
+				</div>
+			</div>
+			<div slot="footer" style="text-align:center">
+				<Button type="info" style="margin-right: 20px" size="large" @click="selectUnitCancel">取消</Button>
+				<Button type="primary" size="large" @click="seletUnitConfirm">保存</Button>
+			</div>
+		</Modal>
+
+		<!-- 选择主要责任人弹窗 -->
+		<Modal
+			v-model="selectPersonShow"
+			title="选择主要负责人"
+			class="person-modal"
+			:mask-closable="false"
+			@on-visible-change="closePersonSelect"
+		>
+			<personLists ref="mainPersonRef" types="mainPerson" @selectMainPerson="selectMainPerson"></personLists>
+			<div slot="footer" style="text-align:center">
+				<Button type="info" style="margin-right: 20px" size="large" @click="selectCancel">取消</Button>
+				<Button type="primary" size="large" @click="seletConfirm">保存</Button>
+			</div>
+		</Modal>
+
+		<!-- 新增弹窗 -->
+		<Modal
+			v-model="modalAddShow"
+			:title="modalTitle"
+			class="edit-modal"
+			:mask-closable="false"
+			@on-visible-change="close"
+		>
+			<Form
+				ref="editFormRef"
+				:rules="ruleValidate"
+				:model="addFormData"
+				:label-width="80"
+				label-position="right"
+			>
+				<div class="search-bar">
+					<el-row class="weibao">
+						<el-col>维保单位信息</el-col>
+					</el-row>
+					<searche-Header-Wrapper style="text-align:center!important">
+						<form-item
+							title="维保单位"
+							type="text"
+							v-model="addFormData.vcName"
+							placeholder="输入维保单位"
+							clearable
+							noMBottom
+							style="margin: 0 80px 10px 170px!important"
+						></form-item>
+						<form-item title="主要负责人" type="text" v-model="addFormData.userName" clearable noMBottom></form-item>
+						<Button
+							type="success"
+							size="large"
+							@click="selectPerson"
+							style="margin: 0 80px 10px 0!important"
+						>请选择负责人</Button>
+						<form-item
+							title="负责人电话"
+							type="text"
+							v-model="addFormData.telePhone"
+							placeholder="输入负责人电话"
+							clearable
+							noMBottom
+						></form-item>
+						<form-item
+							title="备注"
+							type="textarea"
+							v-model="addFormData.vcMemo"
+							placeholder="请输入..."
+							clearable
+							noMBottom
+							style="margin: 0 80px 0 170px!important"
+							class="lastForm"
+						></form-item>
+					</searche-Header-Wrapper>
+				</div>
+				<div class="info">
+					<div class="info-left">
+						<el-row class="mingxi">
+							<el-col>已配置的维保人员</el-col>
+						</el-row>
+						<div class="info-body">
+							<el-table
+								:data="configuredPersonLists"
+								style="width: 100%"
+								height="300"
+								empty-text="暂无数据"
+								border
+								@select="selectConfiguredPerson"
+								@select-all="selectAll"
+							>
+								<el-table-column type="selection" width="30"></el-table-column>
+								<el-table-column prop="title" label="姓名" align="center" width="80"></el-table-column>
+								<el-table-column prop="gener" label="性别" align="center" width="70"></el-table-column>
+								<el-table-column prop="telePhone" label="电话" align="center" width="130"></el-table-column>
+								<el-table-column prop="idCode" label="身份证" align="center" width="160"></el-table-column>
+								<el-table-column prop="text" label="备注" align="center" minwWidth="100"></el-table-column>
+							</el-table>
+						</div>
+					</div>
+					<Button class="left" type="info" @click="addPerson">&lt;&lt;</Button>
+					<Button class="right" type="primary" @click="delPerson">&gt;&gt;</Button>
+					<div class="info-right">
+						<el-row>
+							<el-col>所有人员信息</el-col>
+						</el-row>
+						<div class="info-right-bottom">
+							<personLists ref="personRef" @addp="aperson"></personLists>
+						</div>
+					</div>
+				</div>
+			</Form>
+
+			<div slot="footer" style="text-align:center">
+				<Button type="info" style="margin-right: 20px" size="large" @click="handleModalCancel">取消</Button>
+				<Button type="primary" size="large" @click="handleAddStation">保存</Button>
+			</div>
+		</Modal>
+	</div>
+</template>
+<script>
+import { clearInterval } from 'timers'
+import personLists from './personLists'
+export default {
+	name: 'fire-part',
+	components: { personLists },
+	props: {},
+	data() {
+		return {
+			unitName: '',
+			selectUnitShow: false,
+			data: [
+				{
+					id: 1,
+					label: '一级 1',
+					children: [
+						{
+							id: 4,
+							label: '二级 1-1',
+							children: [
+								{
+									id: 9,
+									label: '三级 1-1-1'
+								},
+								{
+									id: 10,
+									label: '三级 1-1-2'
+								}
+							]
+						}
+					]
+				},
+				{
+					id: 2,
+					label: '一级 2',
+					children: [
+						{
+							id: 5,
+							label: '二级 2-1'
+						},
+						{
+							id: 6,
+							label: '二级 2-2'
+						}
+					]
+				},
+				{
+					id: 3,
+					label: '一级 3',
+					children: [
+						{
+							id: 7,
+							label: '二级 3-1'
+						},
+						{
+							id: 8,
+							label: '二级 3-2'
+						}
+					]
+				}
+			],
+			defaultProps: {
+				children: 'children',
+				label: 'label'
+			},
+
+			file: {},
+			infoList: '',
+			infoLists: [],
+			fileList: [],
+			// 搜索下拉框
+			typeList: [],
+			levelList: [
+				// 搜索下拉框
+				{
+					value: '1',
+					label: '一级'
+				},
+				{
+					value: '2',
+					label: '二级'
+				},
+				{
+					value: '3',
+					label: '三级'
+				}
+			],
+			searchData: {
+				vcName: ''
+			}, // 维保单位名称
+			axios: this.$api.maintenancePerson,
+			modalAddShow: false,
+			tableColumns: [
+				{
+					title: '维保单位名称',
+					key: 'coName',
+					align: 'center',
+					maxWidth: 200
+				},
+				{
+					title: '主要负责人',
+					key: 'userName',
+					align: 'center',
+					width: 200
+				},
+				{
+					title: '联系电话',
+					key: 'telePhone',
+					width: 200,
+					align: 'center'
+				},
+				{
+					title: '维保人数',
+					key: 'personNum',
+					align: 'center',
+					width: 150
+				},
+				{
+					title: '维保站数',
+					key: 'unitNum',
+					width: 200,
+					align: 'center'
+				},
+				{
+					title: '备注',
+					key: 'vcMemo',
+					minWidth: 200,
+					align: 'center'
+				},
+				{
+					title: '操作',
+
+					key: 'action',
+					align: 'center',
+					width: 230,
+					render: (h, params) => {
+						return h('div', [
+							h(
+								'Button',
+								{
+									props: {
+										type: 'warning',
+										icon: 'ios-create-outline'
+									},
+									on: {
+										click: () => {
+											this.handleModalShow(1, params)
+										}
+									}
+								},
+								'编辑'
+							),
+							h(
+								'Button',
+								{
+									props: {
+										type: 'error',
+										icon: 'md-trash'
+									},
+									on: {
+										click: () => {
+											this.handleRemove(params)
+										}
+									}
+								},
+								'删除'
+							)
+						])
+					}
+				}
+			],
+			tableData: [],
+
+			//添加/编辑表单数据
+			addFormData: {
+				mtcCoId: '',
+				vcName: '',
+				telePhone: '',
+				personId: '',
+				vcMemo: '',
+				userName: ''
+			},
+
+			// 分页信息
+			total: 3,
+			page: 1,
+			pageSize: 20,
+			modalTitle: '新增',
+			isAdd: true,
+			forData: [],
+			isCurrent: true,
+
+			//选择主要责任人
+			selectPersonShow: false,
+			personList: [], //选中的负责人数据
+			persons: [], //需要添加到已配置维保人员
+			addPersonIds: [], //新增已配置维保人员的id
+			configuredPersonLists: [], //已配置人员列表
+			selectConfiguredList: [] //选中的已配置人员
+		}
+	},
+	computed: {},
+	filters: {},
+	watch: {
+		personList: function(val) {
+			console.log(val)
+			this.addFormData.telePhone = val[0].telePhone
+			this.addFormData.userName = val[0].title
+		},
+		configuredPersonLists: function(val) {
+			this.addPersonIds = []
+			val.forEach(item => {
+				this.addPersonIds.push(item.id)
+			})
+		}
+	},
+	created() {
+		this.getTable()
+	},
+	mounted() {},
+	activited() {},
+	update() {},
+	beforeDestory() {},
+	methods: {
+		//移除已配置维保人员
+		delPerson() {
+			this.selectConfiguredList.forEach(item => {
+				this.configuredPersonLists.forEach((it, index) => {
+					if (it == item) {
+						this.configuredPersonLists.splice(index, 1)
+					}
+				})
+			})
+
+			// this.addAllPerson(this.personTableData)
+
+			this.selectConfiguredList = []
+		},
+
+		aperson(val) {
+			this.persons = val
+		},
+
+		//添加到已配置维保人员
+		addPerson() {
+			//等待掉接口
+			this.$refs.personRef.getTable()
+
+			this.configuredPersonLists = [...this.configuredPersonLists, ...this.persons]
+			// this.getPersonList(this.personTableData)
+			this.persons = []
+		},
+
+		//递归循环,页面删除所有人员信息中添加到已配置人员的信息
+		getPersonList(params) {
+			this.configuredPersonLists.forEach(item => {
+				params.forEach((it, index) => {
+					if (it == item) {
+						params.splice(index, 1)
+					} else {
+						if (it.children.length != 0) {
+							this.getPersonList(it.children)
+						}
+					}
+				})
+			})
+		},
+
+		//递归循环，把选中的已配置人员添加到所有人员中
+		addAllPerson(params) {
+			this.selectConfiguredList.forEach(item => {
+				params.forEach(it => {
+					if (it.pid == item.pid) {
+						if (!params.some(i => i == item)) {
+							params.push(item)
+						}
+						return
+					} else {
+						if (it.children.length != 0) {
+							this.addAllPerson(it.children)
+						} else {
+							if (it.id == item.pid) {
+								if (!it.children.some(i => i == item)) {
+									it.children.push(item)
+								}
+								return
+							}
+						}
+					}
+					return false
+				})
+			})
+		},
+
+		//选择维保责任人弹窗
+		selectPerson() {
+			//查询所有人员
+			this.$refs.mainPersonRef.getTable({
+				userName: this.addFormData.userName
+			})
+			this.selectPersonShow = true
+		},
+		//配置维保变电站
+		deployUnit() {
+			if (this.forData.length == 0) {
+				this.$Message.info({
+					content: '请点击列表信息!!!',
+					duration: 3
+				})
+			} else {
+				this.unitName = this.forData.coName
+				this.selectUnitShow = true
+			}
+		},
+		//点击表格
+		rowClick(row) {
+			console.log(row)
+			this.isCurrent = true
+			this.forData = row
+		},
+
+		// 查询
+		searchStation() {
+			this.getTable()
+		},
+		// 重置
+		handleResetData() {
+			this.searchData.vcName = ''
+			this.getTable()
+		},
+		_forEach: function(data, isTrue, callback) {
+			var arr = []
+			for (var i = 0; i < data.length; i++) {
+				arr.push(data[i])
+			}
+			while (arr.length) {
+				var _p = arr.shift()
+				if (callback(_p) == false) {
+					return
+				}
+				if (isTrue && _p.children) {
+					for (var j = _p.children.length - 1; j >= 0; j--) {
+						arr.unshift(_p.children[j])
+					}
+				}
+			}
+		},
+
+		// 获取表格数据列表
+		getTable() {
+			let params = {
+				currentPage: this.page,
+				pageSize: this.pageSize,
+				vcName: this.searchData.vcName
+			}
+			this.axios.getTableList(params).then(res => {
+				if (res.code == 200) {
+					this.tableData = res.data.list
+					this.total = res.data.total
+					console.log(this.tableData)
+				}
+			})
+		},
+
+		// 删除
+		handleRemove(params) {
+			console.log(params)
+			this.$Modal.confirm({
+				title: '删除',
+				content: '确认删除所选项?',
+				onOk: () => {
+					this.axios.delMaintenanceDate({ id: params.row.id }).then(res => {
+						if (res.code == 200) {
+							this.$Message.success('删除成功')
+							this.page = 1
+							this.getTable()
+						} else {
+							this.$Message.warning(res.msg)
+						}
+					})
+				},
+				onCancel: () => {}
+			})
+		},
+
+		// 添加/编辑按钮
+		handleModalShow(data, params) {
+			data == 0 ? (this.modalTitle = '新增') : (this.modalTitle = '修改')
+			data == 0 ? (this.isAdd = true) : (this.isAdd = false)
+			if (data !== 0) {
+				this.addFormData = JSON.parse(JSON.stringify(params.row))
+				this.addFormData.vcName = this.addFormData.coName
+			}
+			this.$refs.personRef.getTable(params)
+			setTimeout(() => {
+				this.modalAddShow = true
+			}, 50)
+		},
+
+		//确认添加/编辑按钮
+		async handleAddStation() {
+			let params = {}
+			if (this.isAdd) {
+				// 新增
+				this.addFormData.personId = this.addPersonIds
+				params = this.addFormData
+				console.log(params)
+				let res = await this.axios.addPerson(params)
+				if (res.success) {
+					this.getTable()
+					this.modalAddShow = false
+				}
+			} else {
+				// 修改
+				this.$refs.addFormRef.validate(async valid => {
+					if (!valid) return
+					//验证成功，掉接口提交数据
+					params.mtcCoId = this.addFormData.mtcCoId
+
+					let res = await this.axios.addMaintenanceDate(params)
+					if (res.success) {
+						this.getTable()
+						this.modalAddShow = false
+					}
+				})
+			}
+		},
+		//取消按钮
+		handleModalCancel() {
+			this.$refs.editFormRef.resetFields()
+			this.modalAddShow = false
+		},
+		//关闭对话框
+		close() {
+			if (!this.modalAddShow) {
+				this.$refs.editFormRef.resetFields()
+				this.addFormData.mtcCoId = ''
+				this.addFormData.vcName = ''
+				this.addFormData.personId = ''
+				this.addFormData.vcMemo = ''
+				this.addFormData.telePhone = ''
+				this.addFormData.userName = ''
+			}
+
+			this.forData = []
+		},
+
+		//关闭维保变电站配置
+		closeUnitShow() {
+			if (!this.selectUnitShow) {
+				this.forData = []
+			}
+		},
+		selectUnitCancel() {
+			this.forData = []
+			this.selectUnitShow = false
+		},
+		seletUnitConfirm() {
+			this.forData = []
+			this.selectUnitShow = false
+		},
+
+		// 主要负责人弹框取消
+		selectCancel() {
+			this.selectPersonShow = false
+		},
+		//主要负责人选择确认
+		seletConfirm() {
+			this.selectPersonShow = false
+		},
+		//关闭主要负责人弹框
+		closePersonSelect() {},
+		//选中主要责任人
+		selectMainPerson(val) {
+			// console.log(val)
+			this.personList = val
+		},
+
+		//选中已配置人员
+		selectConfiguredPerson(row) {
+			this.selectConfiguredList = row
+		},
+		selectAll(row) {
+			this.selectConfiguredList = row
+		},
+
+		// 分页切换
+		handleChangePage(page) {
+			this.page = page
+			this.getTable()
+		},
+		// 分页条数
+		handleChangePageSize(pageSize) {
+			this.pageSize = pageSize
+			this.getTable()
+		},
+
+		handlePreview(file) {
+			console.log(file)
+		},
+		handleUpload(file) {
+			this.file = file
+		},
+
+		addInfoLists() {
+			if (this.infoList) {
+				this.infoLists.push(this.infoList)
+			}
+			this.infoList = ''
+			console.log(this.infoLists)
+		}
+	},
+	beforeRouteEnter(to, from, next) {
+		next()
+	},
+	beforeRouteUpdate(to, from, next) {
+		next()
+	},
+	beforeRouteLeave(to, from, next) {
+		next()
+	}
+}
+</script>
+<style lang="stylus" scoped>
+.fire-part {
+  width: 100%;
+
+  // height: calc(100vh - 160px);
+  .left-tree {
+    width: 240px;
+    height: calc(100vh - 194px);
+    background-color: #fff;
+    border: 10px solid #fff;
+    overflow: auto;
+    float: left;
+  }
+
+  .right-content {
+    width: calc(100% - 250px);
+    height: 100%;
+    float: left;
+    margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+
+    .tool-bar {
+      .btn-box {
+        .ivu-btn {
+          margin-right: 10px;
+        }
+      }
+    }
+
+    .table-content {
+      width: 100%;
+
+      // flex: 1;
+      // position: relative;
+      /deep/ .ivu-table-wrapper {
+        height: calc(100vh - 268px) !important;
+
+        .ivu-table-body, .ivu-table-overflowY, .ivu-table-tip, .ivu-table-tip td {
+          height: calc(100vh - 270px) !important;
+        }
+      }
+
+      // /deep/.ivu-table-body, /deep/.ivu-table-overflowY {
+      // height: calc(100% - 40px) !important;
+      // }
+      /deep/.ivu-table {
+        p {
+          color: #19be6b;
+        }
+
+        b {
+          font-weight: 400;
+          color: #ff9900;
+        }
+
+        i {
+          font-style: normal;
+        }
+      }
+
+      /deep/tr.ivu-table-row-hover td {
+        background-color: #F5F7FA;
+      }
+
+      /deep/.ivu-btn {
+        font-size: 14px;
+      }
+
+      .table-page {
+        width: 100%;
+        position: absolute;
+        bottom: 20px;
+
+        .page-content {
+          width: 800px;
+          margin-left: 50%;
+          transform: translateX(-50%);
+        }
+      }
+    }
+  }
+}
+
+.upload-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+
+  .steps {
+    margin-left: 30px;
+    margin-bottom: 30px;
+  }
+
+  .up-box {
+    margin-left: 50px;
+    font-size: 16px;
+    color: #515a6e;
+    margin-top: 30px;
+
+    span {
+      font-size: 16px;
+      margin-top: 10px;
+      color: #464c5b;
+      font-weight: 700;
+      display: block;
+
+      .del {
+        float: left;
+        display: inline-block;
+        width: 30px;
+        text-align: center;
+        font-size: 18px;
+        line-height: 100%;
+        color: #2b85e4;
+        cursor: pointer;
+
+        &:hover {
+          color: #ed4014;
+        }
+      }
+    }
+  }
+
+  .btn1 {
+    width: 400px;
+    margin: 10px 10px 10px 50px;
+  }
+}
+
+.axis-form-item {
+  .icon-wrapper {
+    width: 80px;
+    height: 32px;
+    flex-align(center, center);
+    margin-left: 10px;
+
+    .ivu-icon {
+      font-size: 24px;
+      cursor: pointer;
+
+      &:hover {
+        color: #2d8cf0;
+      }
+    }
+  }
+
+  /deep/.ivu-form-item-content {
+    display: flex;
+
+    .ivu-input-wrapper {
+      &:first-of-type {
+        margin-right: 10px;
+      }
+    }
+  }
+}
+
+/deep/ .ivu-btn-error {
+  margin-left: 10px;
+}
+
+.reset {
+  margin: 0 10px;
+}
+
+.edit-modal {
+  /deep/ .ivu-modal {
+    width: 1700px !important;
+
+    .ivu-modal-content {
+      height: 860px !important;
+      position: relative;
+
+      .ivu-modal-footer {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 100%;
+        text-align: center;
+
+        button {
+          margin-right: 20px;
+        }
+      }
+    }
+  }
+}
+
+/deep/ .lastForm .content-wrap .ivu-input-wrapper {
+  width: 36.5rem !important;
+
+  .ivu-input {
+    max-height: 54.9997px;
+  }
+}
+
+/deep/ .ivu-modal-content {
+  top: -50px !important;
+}
+
+.search-bar {
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 5px;
+
+  .weibao {
+    height: 42px;
+    box-sizing: border-box;
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 32px;
+    padding: 5px;
+    background-color: #4e89bb;
+  }
+}
+
+.info {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid #ccc;
+  padding: 10px;
+  height: 565px;
+
+  .left, .right {
+    position: absolute;
+    height: 60px !important;
+    top: 460px;
+    left: 676px;
+    font-size: 20px;
+    text-align: center;
+  }
+
+  .right {
+    top: 540px;
+  }
+
+  /deep/ .ivu-upload-list-file {
+    display: none;
+  }
+
+  .info-left {
+    width: 39%;
+    // height: 200px;
+    border: 1px solid #ccc;
+
+    .mingxi {
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+      font-weight: 700;
+      font-size: 14px;
+      background-color: #4e89bb;
+      color: #fff;
+
+      .el-col {
+        line-height: 32px;
+      }
+    }
+
+    /deep/ .el-table__body-wrapper {
+      height: 453.6px !important;
+    }
+
+    .info-body {
+      position: relative;
+      height: 85%;
+
+      .el-table {
+        height: 98% !important;
+      }
+
+      /deep/ textarea.ivu-input {
+        border: none !important;
+        outline: none !important;
+        border-left: 1px solid #ccc !important;
+      }
+
+      .el-col:first-child {
+        text-align: center;
+        height: 100%;
+        width: 58.25px;
+
+        // line-height: 50px;
+        button {
+          width: 100%;
+        }
+      }
+
+      .el-row {
+        height: 100%;
+        border: 1px solid #ccc !important;
+      }
+    }
+  }
+
+  .info-right {
+    width: 56.8%;
+    // height: 200px;
+    border: 1px solid #ccc;
+
+    .el-row {
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+      font-weight: 700;
+      font-size: 14px;
+      background-color: #4e89bb;
+      color: #fff;
+
+      .el-col {
+        line-height: 32px;
+      }
+    }
+  }
+}
+
+.person-modal {
+  /deep/ .ivu-modal {
+    width: 1000px !important;
+  }
+}
+
+.unit-modal {
+	height 500px;
+  .unitInfo {
+    border: 1px solid #ccc;
+
+    .unitInfo-header {
+      height: 42px;
+      line-height: 32px;
+      font-weight: 700;
+      background-color: #4e89bb;
+      box-sizing: border-box;
+      color: #fff;
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+    }
+  }
+}
+</style>

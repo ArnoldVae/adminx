@@ -1,0 +1,56 @@
+import axios from '@/config/api.request'
+
+export default {
+	// 获取表格数据
+	getTableList(params) {
+		return axios.request({
+			url: 'fireRpInfo/fireRpInfoSimpleList',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	
+	// 删除数据
+	delTableDate(params) {
+		return axios.request({
+			url: 'fireRpInfo/fireRpInfoDel',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	
+	// 新增数据
+	addTableDate(params) {
+		return axios.request({
+			url: 'fireRpInfo/fireRpInfoSave',
+			method: 'post',
+			data: params
+		})
+    },
+	// 编辑数据
+	editTableDate(params) {
+		return axios.request({
+			url: 'fireRpInfo/fireRpInfoSaveOrUpdate',
+			method: 'post',
+			data: params
+		})
+    },
+
+	// 获取所有消防预案类型
+	getContingencyPlanDate(params) {
+		return axios.request({
+			url: 'sys_dict/group/find_list',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+	},
+	//获取所有预案明细
+	getAllContingencyPlanDate(params) {
+		return axios.request({
+			url: 'fireRpItem/fireRpItemList',
+			method: 'post',
+			data: JSON.stringify(params)
+		})
+    }
+	
+}
